@@ -178,7 +178,7 @@ def calc_factor1(df: pl.DataFrame,
     df = (
         df
         .sort(by1, by2)
-        .with_columns(factor1=(pl.col(close).shift(1, fill_value=pl.col(pre_close)) / pl.col(pre_close)).round(8).over(by1, order_by=by2))
+        .with_columns(factor1=(pl.col(close).shift(1, fill_value=pl.col(pre_close).first()) / pl.col(pre_close)).round(8).over(by1, order_by=by2))
         .with_columns(factor2=(pl.col('factor1').cum_prod()).over(by1, order_by=by2))
     )
     return df

@@ -103,7 +103,7 @@ if __name__ == "__main__":
             time.sleep(0.5)
             continue
         last_time = curr_time
-        main(curr_time)
+        main(int(curr_time))
 
     # # TODO 测试用，记得修改日期
     # for curr_time in range(int(datetime(2025, 3, 5, 9, 29).timestamp() // 60 * 60),
