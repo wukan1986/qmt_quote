@@ -50,6 +50,7 @@ def save_1m(start_time, end_time):
     df = get_local_data_wrap(G.沪深A股, period, start_time, end_time, data_dir=DATA_DIR)
     print('沪深A股_1m===========')
     print(df.select(min_time=pl.min('time'), max_time=pl.max('time'), count=pl.count('time')))
+    print(df.select(date=pl.col('time').dt.date()).group_by(by='date').agg(date=pl.last('date'), count=pl.count('date')).sort('date'))
     df.write_parquet(HISTORY_STOCK_1m)
 
 
@@ -59,6 +60,7 @@ def save_5m():
     df = convert_1m_to_5m(df, period, closed="right", label="right")
     print('沪深A股_5m===========')
     print(df.select(min_time=pl.min('time'), max_time=pl.max('time'), count=pl.count('time')))
+    print(df.select(date=pl.col('time').dt.date()).group_by(by='date').agg(date=pl.last('date'), count=pl.count('date')).sort('date'))
     df.write_parquet(HISTORY_STOCK_5m)
 
 
