@@ -108,31 +108,29 @@ def load_history_data(path: str, type: int = InstrumentType.Stock) -> pl.DataFra
     return df
 
 
-def last_factor(arr: np.ndarray, func=None, filter_label1: float = 0, filter_label2: float = 0) -> pl.DataFrame:
+def last_factor(arr: np.ndarray, func=None, filter_label: float = 0, filter_exprs_pre=[], filter_exprs_post=[]) -> pl.DataFrame:
     """获取最终因子值
 
     Parameters
     ----------
     arr:
         当日分钟数据
-    filter_label1:int
+    filter_label:int
         只取已经完成的K线数据。底层需要*1000转ms
-    filter_label2:int
-        只取指定K线。底层需要*1000转ms
     func
         因子计算函数
 
     """
     arr = arr[arr['type'] == InstrumentType.Stock]  # 过滤掉指数，只处理股票
-    if filter_label1 > 0:
-        arr = arr[arr['time'] <= filter_label1]
+    if filter_label > 0:
+        arr = arr[arr['time'] <= filter_label]
     df = pl.from_numpy(arr)
+    # 提前过滤票池，提高速度
+    df = df.filter(filter_exprs_pre)
     # 注意：时间没有转换成datetime类型
     df = calc_factor1(df)
     if func is not None:
         df = func(df)
-    if filter_label2 > 0:
-        # df = df.filter(pl.col('time').dt.timestamp(time_unit='ms') == filter_label2)
-        df = df.filter(pl.col('time') >= filter_label2)
+    df = df.filter(filter_exprs_post)
     df = cast_datetime(df, col=pl.col('time', 'open_dt', 'close_dt'))
     return df

@@ -82,10 +82,13 @@ def main(curr_time: int) -> None:
     label_1d *= 1000
 
     t1 = time.perf_counter()
+
+    filter_exprs = ~pl.col('stock_code').str.starts_with('68')
+
     # TODO 计算因子
-    df1m = last_factor(d1m.tail(TAIL_N), factor_func_1m, label_1m, label_1m)  # 1分钟线
-    df5m = last_factor(d5m.tail(TAIL_N), factor_func_5m, label_5m, label_5m)  # 5分钟线
-    df1d = last_factor(d1d.tail(TAIL_N), factor_func_1d, label_1d, label_1d)  # 日线，要求当天K线是动态变化的
+    df1m = last_factor(d1m.tail(TAIL_N), factor_func_1m, label_1m, filter_exprs, pl.col('time') >= label_1m)  # 1分钟线
+    df5m = last_factor(d5m.tail(TAIL_N), factor_func_5m, label_5m, filter_exprs, pl.col('time') >= label_5m)  # 5分钟线
+    df1d = last_factor(d1d.tail(TAIL_N), factor_func_1d, label_1d, filter_exprs, pl.col('time') >= label_1d)  # 日线，要求当天K线是动态变化的
     t2 = time.perf_counter()
 
     # if df1m.is_empty():
@@ -112,11 +115,14 @@ def main(curr_time: int) -> None:
 if __name__ == "__main__":
     bm_s1d = BarManagerS(s1d._a, s1d._t)
 
+    # 由于numba class没有缓存，编译要时间
+    print("=" * 60)
     # 实盘运行
     last_time = -1
     while True:
         # 调整成成分钟标签，用户可以考虑设置成10秒等更快频率。注意!!!内存映射文件要扩大几倍
         curr_time = datetime.now().timestamp() // 60 * 60
+        # curr_time = datetime(2025, 7, 4, 13, 30).timestamp() // 60 * 60
         if curr_time == last_time:
             time.sleep(0.5)
             continue
