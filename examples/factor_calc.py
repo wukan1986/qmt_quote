@@ -23,11 +23,11 @@ from polars_ta.prefix.cdl import *  # noqa
 DataFrame = TypeVar("DataFrame", _pl_LazyFrame, _pl_DataFrame)
 # ===================================
 
-_ = ["factor2", "B", "close", "CLOSE", "A"]
-[factor2, B, close, CLOSE, A] = [pl.col(i) for i in _]
+_ = ["volume", "北交所", "上海主板", "low", "最大涨幅限制", "科创板", "high", "B", "创业板", "open", "vwap", "深圳主板", "amount", "preClose", "factor2", "A", "CLOSE", "close"]
+[volume, 北交所, 上海主板, low, 最大涨幅限制, 科创板, high, B, 创业板, open, vwap, 深圳主板, amount, preClose, factor2, A, CLOSE, close] = [pl.col(i) for i in _]
 
-_ = ["MA5", "MA10", "OUT"]
-[MA5, MA10, OUT] = [pl.col(i) for i in _]
+_ = ["OPEN", "HIGH", "LOW", "VWAP", "high_limit", "low_limit", "MA5", "MA10", "OUT"]
+[OPEN, HIGH, LOW, VWAP, high_limit, low_limit, MA5, MA10, OUT] = [pl.col(i) for i in _]
 
 _DATE_ = "time"
 _ASSET_ = "stock_code"
@@ -46,7 +46,18 @@ CS_SW_L1 = r"^sw_l1_\d+$"
 def func_0_cl(df: DataFrame) -> DataFrame:
     # ========================================
     df = df.with_columns(
+        vwap=amount / volume,
+        OPEN=factor2 * open,
+        HIGH=factor2 * high,
+        LOW=factor2 * low,
         CLOSE=close * factor2,
+        最大涨幅限制=if_else(北交所, 0.3, 0) + if_else(上海主板 | 深圳主板, 0.1, 0) + if_else(创业板 | 科创板, 0.2, 0),
+    )
+    # ========================================
+    df = df.with_columns(
+        VWAP=factor2 * vwap,
+        high_limit=preClose * (最大涨幅限制 + 1),
+        low_limit=-preClose * (最大涨幅限制 - 1),
     )
     return df
 
@@ -79,7 +90,16 @@ def func_3_cl(df: DataFrame) -> DataFrame:
 
 """
 #========================================func_0_cl
+vwap = amount/volume #
+OPEN = factor2*open #
+HIGH = factor2*high #
+LOW = factor2*low #
 CLOSE = close*factor2 #
+最大涨幅限制 = if_else(北交所, 0.3, 0) + if_else(上海主板 | 深圳主板, 0.1, 0) + if_else(创业板 | 科创板, 0.2, 0) #
+#========================================func_0_cl
+VWAP = factor2*vwap #
+high_limit = preClose*(最大涨幅限制 + 1) #
+low_limit = -preClose*(最大涨幅限制 - 1) #
 #========================================func_1_ts__stock_code
 MA5 = ts_mean(CLOSE, 5) #
 MA10 = ts_mean(CLOSE, 10) #
@@ -91,7 +111,15 @@ OUT = B <= 5 #
 """
 
 """
+vwap = amount/volume #
+VWAP = factor2*vwap #
+OPEN = factor2*open #
+HIGH = factor2*high #
+LOW = factor2*low #
 CLOSE = close*factor2 #
+最大涨幅限制 = if_else(北交所, 0.3, 0) + if_else(上海主板 | 深圳主板, 0.1, 0) + if_else(创业板 | 科创板, 0.2, 0) #
+high_limit = preClose*(最大涨幅限制 + 1) #
+low_limit = preClose*(1 - 最大涨幅限制) #
 MA5 = ts_mean(CLOSE, 5) #
 MA10 = ts_mean(CLOSE, 10) #
 A = ts_returns(CLOSE, 5) #

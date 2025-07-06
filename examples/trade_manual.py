@@ -17,7 +17,7 @@ from xtquant.xttype import StockAccount
 sys.path.insert(0, str(Path(__file__).parent))  # 当前目录
 sys.path.insert(0, str(Path(__file__).parent.parent))  # 上一级目录
 
-from examples.config import FILE_d1d, USERDATA_DIR, ACCOUNT, FILE_s1d
+from examples.config import FILE_d1d, USERDATA_DIR, ACCOUNT, FILE_s1d, FILE_details
 from qmt_quote.enums import SizeType
 from qmt_quote.trader_callback import MyXtQuantTraderCallback
 from qmt_quote.utils_trade import to_dict, objs_to_dataframe, cancel_orders, before_market_open, send_orders_1, \
@@ -35,6 +35,7 @@ s1d = NPYT(FILE_s1d).load(mmap_mode="r")
 G = Exception()
 details = before_market_open(G)
 print("获取当天涨跌停价(含ST/退)：\n", details)
+details.to_parquet(FILE_details)
 
 if __name__ == "__main__":
     print("demo test")

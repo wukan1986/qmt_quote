@@ -12,7 +12,7 @@ https://imdisk-toolkit.en.lo4d.com/download
 
 # =====历史行情======
 # TODO 历史数据目录，使用实盘QMT标准版，可以手工下载历史数据，然后在miniquant中读出,也可用第三方数据
-DATA_DIR = r"D:\e海方舟-量化交易版\datadir"
+DATA_DIR = r"D:\国泰海通方舟量化版交易端\datadir"
 
 # TODO: 历史数据文件
 HISTORY_STOCK_1d = r"F:\stock_1d.parquet"
@@ -53,6 +53,9 @@ BACKUP_DIR = r"F:\backup"
 # 信号
 FILE_s1t = r"M:\s1t.npy"  # 顺序记录插入的信号
 FILE_s1d = r"M:\s1d.npy"  # 日频信号，用与下单
+
+# =====实盘行情信息======
+FILE_details = r"M:\details.parquet"
 
 # TODO 交易目录，miniquant版
 USERDATA_DIR = r"D:\迅投极速交易终端 睿智融科版\userdata_mini"

@@ -129,6 +129,13 @@ def last_factor(arr: np.ndarray, func=None, filter_label: float = 0, filter_expr
     df = df.filter(filter_exprs_pre)
     # 注意：时间没有转换成datetime类型
     df = calc_factor1(df)
+    df = df.with_columns([
+        pl.col('stock_code').str.starts_with('60').alias('上海主板'),
+        pl.col('stock_code').str.starts_with('00').alias('深圳主板'),
+        pl.col('stock_code').str.starts_with('68').alias('科创板'),
+        pl.col('stock_code').str.starts_with('30').alias('创业板'),
+        (pl.col('stock_code').str.starts_with('8') | pl.col('stock_code').str.starts_with('4') | pl.col('stock_code').str.starts_with('9')).alias('北交所'),
+    ])
     if func is not None:
         df = func(df)
     df = df.filter(filter_exprs_post)

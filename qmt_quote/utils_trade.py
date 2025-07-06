@@ -329,7 +329,7 @@ def cancel_orders(trader, account, orders: Optional[pd.DataFrame] = None,
     return orders
 
 
-def before_market_open(G):
+def before_market_open(G) -> pd.DataFrame:
     """下载板块数据，获取当天涨跌停价
 
     Parameters
