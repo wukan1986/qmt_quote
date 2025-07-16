@@ -4,6 +4,14 @@
 普通版和极速版可以同时开启
 
 建议交易日前一天就提前下载好，并准备好数据，然后看情况是否调整subscribe_minute.py的配置
+
+
+# 20250714
+1. 出现大QMT下载数据不全，只有100多支股票33KB,其他只有3KB。做20交易日数据够用
+2. 出现加载数据无法超过一个月。就算本地有一年多的数据，还是无法下载超过
+
+决定引入其他历史数据源
+
 """
 import sys
 from datetime import datetime, timedelta
@@ -22,7 +30,9 @@ from qmt_quote.bars.agg import convert_1m_to_5m
 from qmt_quote.utils_qmt import get_local_data_wrap
 
 # 开盘前需要先更新板块数据，因为会有新股上市
+print("开始更新板块数据")
 xtdata.download_sector_data()
+print("结束更新板块数据")
 
 G = Exception()
 G.沪深A股 = xtdata.get_stock_list_in_sector("沪深A股")
@@ -35,6 +45,7 @@ def save_1d(start_time, end_time):
     df = get_local_data_wrap(G.沪深A股, period, start_time, end_time, data_dir=DATA_DIR)
     print('沪深A股_1d===========')
     print(df.select(min_time=pl.min('time'), max_time=pl.max('time'), count=pl.count('time')))
+    print(df.select(date=pl.col('time').dt.date()).group_by(by='date').agg(date=pl.last('date'), count=pl.count('date')).sort('date'))
     df.write_parquet(HISTORY_STOCK_1d)
 
     # print(df)
@@ -75,7 +86,7 @@ if __name__ == "__main__":
 
     # ==========
     # logger.info('开始转存数据。请根据自己策略预留一定长度的数据')
-    start_time = datetime.now() - timedelta(days=30)
+    start_time = datetime.now() - timedelta(days=180)
     start_time = start_time.strftime("%Y%m%d")
     save_1d(start_time, end_time)
 

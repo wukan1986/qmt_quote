@@ -108,7 +108,7 @@ def load_history_data(path: str, type: int = InstrumentType.Stock) -> pl.DataFra
     return df
 
 
-def last_factor(arr: np.ndarray, func=None, filter_label: float = 0, filter_exprs_pre=[], filter_exprs_post=[]) -> pl.DataFrame:
+def last_factor(arr: np.ndarray, func, filter_last: bool, filter_label: float = 0, filter_exprs_pre=[]) -> pl.DataFrame:
     """获取最终因子值
 
     Parameters
@@ -127,6 +127,8 @@ def last_factor(arr: np.ndarray, func=None, filter_label: float = 0, filter_expr
     df = pl.from_numpy(arr)
     # 提前过滤票池，提高速度
     df = df.filter(filter_exprs_pre)
+    # df = df.filter(pl.col('stock_code') == '600192.SH')
+    df = cast_datetime(df, col=pl.col('time', 'open_dt', 'close_dt'))
     # 注意：时间没有转换成datetime类型
     df = calc_factor1(df)
     df = df.with_columns([
@@ -137,7 +139,5 @@ def last_factor(arr: np.ndarray, func=None, filter_label: float = 0, filter_expr
         (pl.col('stock_code').str.starts_with('8') | pl.col('stock_code').str.starts_with('4') | pl.col('stock_code').str.starts_with('9')).alias('北交所'),
     ])
     if func is not None:
-        df = func(df)
-    df = df.filter(filter_exprs_post)
-    df = cast_datetime(df, col=pl.col('time', 'open_dt', 'close_dt'))
+        df = func(df, filter_last)
     return df

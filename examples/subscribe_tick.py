@@ -24,7 +24,9 @@ from qmt_quote.enums import InstrumentType
 from qmt_quote.utils import ticks_to_dataframe, generate_code, input_with_timeout
 
 # 开盘前需要先更新板块数据，因为会有新股上市
+print("开始更新板块数据")
 xtdata.download_sector_data()
+print("结束更新板块数据")
 
 G = Exception()
 G.沪深A股 = xtdata.get_stock_list_in_sector("沪深A股")

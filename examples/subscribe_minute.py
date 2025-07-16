@@ -58,6 +58,7 @@ def prepare_mmap(end_date: pl.datetime):
     his_stk_5m = load_history_data(HISTORY_STOCK_5m, type=InstrumentType.Stock)
     his_stk_1d = load_history_data(HISTORY_STOCK_1d, type=InstrumentType.Stock)
 
+    # 注意当天的数据没有写入到NPYT文件
     his_stk_1m = his_stk_1m.filter(pl.col('time') < end_date)
     his_stk_5m = his_stk_5m.filter(pl.col('time') < end_date)
     his_stk_1d = his_stk_1d.filter(pl.col('time') < end_date)
@@ -65,7 +66,7 @@ def prepare_mmap(end_date: pl.datetime):
     # TODO 调整加载的历史数据量，注意有双休和节假日
     his_stk_1m = his_stk_1m.sort('time', 'stock_code').tail(BARS_PER_DAY * 3)
     his_stk_5m = his_stk_5m.sort('time', 'stock_code').tail(BARS_PER_DAY // 5 * 5)
-    his_stk_1d = his_stk_1d.sort('time', 'stock_code').tail(TOTAL_ASSET * 20)
+    his_stk_1d = his_stk_1d.sort('time', 'stock_code').tail(TOTAL_ASSET * 180)
 
     print("=" * 60)
     print(his_stk_1m.select(min_time=pl.min('time'), max_time=pl.max('time'), count=pl.count('time')))

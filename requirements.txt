@@ -4,7 +4,7 @@ polars
 pyarrow
 loguru
 tqdm
-expr_codegen
+expr_codegen>=0.14.0
 polars_ta
 xtquant
 npyt

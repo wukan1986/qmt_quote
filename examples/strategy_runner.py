@@ -49,12 +49,13 @@ TAIL_N = 120000
 
 
 def to_array(df: pl.DataFrame, strategy_id: int = 0) -> np.ndarray:
+    # TODO 注意：这部分的代码请根据自己实际策略进行调整
     arr = df.select(
         "stock_code", pl.col("time").cast(pl.UInt64),
         strategy_id=strategy_id,
-        float32=pl.col('A').cast(pl.Float32),
-        int32=pl.col('B').fill_null(0).cast(pl.Int32),
-        boolean=pl.col('OUT').cast(pl.Boolean),
+        float32=pl.col('入场价').cast(pl.Float32),
+        int32=pl.col('入场价').fill_null(0).cast(pl.Int32),
+        boolean=pl.col('SIGNAL2').cast(pl.Boolean),
     ).select(DTYPE_SIGNAL_1t.names).to_numpy(structured=True)
 
     return arr
@@ -86,23 +87,19 @@ def main(curr_time: int) -> None:
     filter_exprs = ~pl.col('stock_code').str.starts_with('68')
 
     # TODO 计算因子
-    df1m = last_factor(d1m.tail(TAIL_N), factor_func_1m, label_1m, filter_exprs, pl.col('time') >= label_1m)  # 1分钟线
-    df5m = last_factor(d5m.tail(TAIL_N), factor_func_5m, label_5m, filter_exprs, pl.col('time') >= label_5m)  # 5分钟线
-    df1d = last_factor(d1d.tail(TAIL_N), factor_func_1d, label_1d, filter_exprs, pl.col('time') >= label_1d)  # 日线，要求当天K线是动态变化的
+    df1m = last_factor(d1m.tail(TAIL_N), factor_func_1m, True, label_1m, filter_exprs)  # 1分钟线
+    df5m = last_factor(d5m.tail(TAIL_N), factor_func_5m, True, label_5m, filter_exprs)  # 5分钟线
+    df1d = last_factor(d1d.tail(TOTAL_ASSET * 120), factor_func_1d, True, label_1d, filter_exprs)  # 日线，要求当天K线是动态变化的
     t2 = time.perf_counter()
 
-    # if df1m.is_empty():
-    #     print("没有1分钟数据，返回")
-    #     return
-
     # 测试用，观察time/open_dt/close_dt
-    print(df1m.tail(1))
-    print(df5m.tail(1))
+    # print(df1m.tail(1))
+    # print(df5m.tail(1))
     print(df1d.tail(1))
 
     # 将3个信号增量更新到内存文件映射
-    s1t.append(to_array(df1m, strategy_id=1))
-    s1t.append(to_array(df5m, strategy_id=2))
+    # s1t.append(to_array(df1m, strategy_id=1))
+    # s1t.append(to_array(df5m, strategy_id=2))
     s1t.append(to_array(df1d, strategy_id=3))
 
     # 内存文件映射读取
@@ -110,6 +107,8 @@ def main(curr_time: int) -> None:
     # 只显示最新的3条
     print(end, datetime.now(), t2 - t1)
     print(s1d.tail(3))
+    dd = pd.DataFrame(s1d.tail(TOTAL_ASSET))
+    print(dd[dd['boolean']])
 
 
 if __name__ == "__main__":
