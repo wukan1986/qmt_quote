@@ -154,7 +154,7 @@ def concat_interday(df1: Optional[pl.DataFrame], df2: pl.DataFrame) -> pl.DataFr
 
 def calc_factor1(df: pl.DataFrame,
                  by1: str = 'stock_code', by2: str = 'time',
-                 close: str = 'close', pre_close: str = 'preClose') -> pl.DataFrame:
+                 close: str = 'close', pre_close: str = 'pre_close') -> pl.DataFrame:
     """计算复权因子，乘除法。使用交易所发布的昨收盘价计算
 
     Parameters
@@ -188,7 +188,7 @@ def calc_factor1(df: pl.DataFrame,
 
 def calc_factor2(df: pl.DataFrame,
                  by1: str = 'stock_code', by2: str = 'time',
-                 close: str = 'close', pre_close: str = 'preClose') -> pl.DataFrame:
+                 close: str = 'close', pre_close: str = 'pre_close') -> pl.DataFrame:
     """计算复权因子，加减法。使用交易所发布的昨收盘价计算
 
     Parameters

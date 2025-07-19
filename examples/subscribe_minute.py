@@ -37,17 +37,17 @@ sys.path.insert(0, str(Path(__file__).parent.parent))  # 上一级目录
 
 from examples.config import (FILE_d1d, TOTAL_1d, FILE_d1m, TOTAL_1m, TOTAL_5m, FILE_d5m, FILE_d1t, TICKS_PER_MINUTE,
                              BARS_PER_DAY, TOTAL_ASSET)
-from qmt_quote.bars.labels import get_label_stock_5m, get_label_stock_1m
+from qmt_quote.bars.labels import get_label_stock_5m, get_label_stock_1m, get_label_stock_1d
 from qmt_quote.bars.tick_day import BarManager as BarManagerD
 from qmt_quote.bars.tick_minute import BarManager as BarManagerM
-from qmt_quote.dtypes import DTYPE_STOCK_1m, DTYPE_STOCK_1t
+from qmt_quote.dtypes import DTYPE_STOCK_1m, DTYPE_STOCK_1t, DTYPE_STOCK_1d
 from qmt_quote.enums import InstrumentType
 from qmt_quote.utils_qmt import load_history_data  # noqa
 
 # 分种级别数据，将历史TICK和实盘TICK拼接成一个实盘分钟级别数据
 d1m = NPYT(FILE_d1m, dtype=DTYPE_STOCK_1m).save(capacity=TOTAL_1m).load(mmap_mode="r+")
 d5m = NPYT(FILE_d5m, dtype=DTYPE_STOCK_1m).save(capacity=TOTAL_5m).load(mmap_mode="r+")
-d1d = NPYT(FILE_d1d, dtype=DTYPE_STOCK_1m).save(capacity=TOTAL_1d).load(mmap_mode="r+")
+d1d = NPYT(FILE_d1d, dtype=DTYPE_STOCK_1d).save(capacity=TOTAL_1d).load(mmap_mode="r+")
 
 
 def prepare_mmap(end_date: pl.datetime):
@@ -56,6 +56,7 @@ def prepare_mmap(end_date: pl.datetime):
 
     his_stk_1m = load_history_data(HISTORY_STOCK_1m, type=InstrumentType.Stock)
     his_stk_5m = load_history_data(HISTORY_STOCK_5m, type=InstrumentType.Stock)
+    # TODO circulating_cap是额外添加的字段
     his_stk_1d = load_history_data(HISTORY_STOCK_1d, type=InstrumentType.Stock)
 
     # 注意当天的数据没有写入到NPYT文件
@@ -76,7 +77,7 @@ def prepare_mmap(end_date: pl.datetime):
     # 将历史数据添加到内存文件映射，免去计算时拼接的过程
     d1m.clear().append(his_stk_1m.select(DTYPE_STOCK_1m.names).to_numpy(structured=True))
     d5m.clear().append(his_stk_5m.select(DTYPE_STOCK_1m.names).to_numpy(structured=True))
-    d1d.clear().append(his_stk_1d.select(DTYPE_STOCK_1m.names).to_numpy(structured=True))
+    d1d.clear().append(his_stk_1d.select(DTYPE_STOCK_1d.names).to_numpy(structured=True))
 
     logger.info("d1m:{:.4f}, d5m:{:.4f}, d1d:{:.4f}, 注意：0表示空间不够没有插入，0.8以上通常空间不够当天使用，会崩溃",
                 d1m.end() / d1m.capacity(),
@@ -128,7 +129,7 @@ def do(file, is_live=False):
         # 这里要refresh，否则看起来行情延时很大
         pbar.set_description(f"延时 {now - t:8.3f}s", refresh=True)
 
-        bm_d1d.extend(a1t, 3600 * 8)
+        bm_d1d.extend(a1t, get_label_stock_1d, 3600 * 8)
         bm_d5m.extend(a1t, get_label_stock_5m, 3600 * 8)
         bm_d1m.extend(a1t, get_label_stock_1m, 3600 * 8)
 
@@ -143,7 +144,7 @@ if __name__ == "__main__":
     # end_date = pl.datetime(2025, 5, 22, time_unit='ms', time_zone='Asia/Shanghai')
     end_date = pl.lit(datetime.now().date(), dtype=pl.Datetime(time_unit='ms', time_zone='Asia/Shanghai'))
     # 使用今天之前的数据做历史。如果昨天的数据有问题，可以取更早一天，注意节假日
-    prepare_mmap(end_date=end_date - pl.duration(days=0))
+    prepare_mmap(end_date=end_date - pl.duration(days=1))
 
     # TODO 从指定文件加载tick数据，转换成日线和分钟
     FILE_d1t_list = [

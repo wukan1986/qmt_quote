@@ -18,11 +18,11 @@ import os
 from typing import Tuple
 
 import numpy as np
-from numba import uint64, float32, typeof, int32, boolean, int16
+from numba import uint64, float32, typeof, int16
 from numba.experimental import jitclass
 from numba.typed.typeddict import Dict
 
-from qmt_quote.dtypes import DTYPE_SIGNAL_1m
+from qmt_quote.dtypes import DTYPE_SIGNAL_1d
 
 
 class Bar:
@@ -32,9 +32,14 @@ class Bar:
         self.strategy_id: int = 0  # 策略ID
         self.open_dt: int = 0
         self.close_dt: int = 0
-        self.float32: float = 0.
-        self.int32: int = 0
-        self.boolean: bool = False
+        self.f1: float = 0.
+        self.f2: float = 0.
+        self.f3: float = 0.
+        self.f4: float = 0.
+        self.f5: float = 0.
+        self.f6: float = 0.
+        self.f7: float = 0.
+        self.f8: float = 0.
 
     def fill(self, arr: np.ndarray, stock_code: str) -> None:
         """
@@ -44,9 +49,14 @@ class Bar:
         arr['strategy_id'] = self.strategy_id
         arr['open_dt'] = self.open_dt
         arr['close_dt'] = self.close_dt
-        arr['float32'] = self.float32
-        arr['int32'] = self.int32
-        arr['boolean'] = self.boolean
+        arr['f1'] = self.f1
+        arr['f2'] = self.f2
+        arr['f3'] = self.f3
+        arr['f4'] = self.f4
+        arr['f5'] = self.f5
+        arr['f6'] = self.f6
+        arr['f7'] = self.f7
+        arr['f8'] = self.f8
 
     def update(self, signal: np.ndarray, time: int) -> bool:
         """数据增量更新，同一条tick不会重复使用
@@ -63,9 +73,14 @@ class Bar:
             is_new = False
 
         self.close_dt = signal['time']
-        self.float32 = signal['float32']
-        self.int32 = signal['int32']
-        self.boolean = signal['boolean']
+        self.f1 = signal['f1']
+        self.f2 = signal['f2']
+        self.f3 = signal['f3']
+        self.f4 = signal['f4']
+        self.f5 = signal['f5']
+        self.f6 = signal['f6']
+        self.f7 = signal['f7']
+        self.f8 = signal['f8']
 
         return is_new
 
@@ -77,9 +92,14 @@ if os.environ.get('NUMBA_DISABLE_JIT', '0') != '1':
         ('strategy_id', int16),
         ('open_dt', uint64),
         ('close_dt', uint64),
-        ('float32', float32),
-        ('int32', int32),
-        ('boolean', boolean),
+        ('f1', float32),
+        ('f2', float32),
+        ('f3', float32),
+        ('f4', float32),
+        ('f5', float32),
+        ('f6', float32),
+        ('f7', float32),
+        ('f8', float32),
     ]
     Bar = jitclass(spec)(Bar)
 
@@ -136,7 +156,7 @@ if os.environ.get('NUMBA_DISABLE_JIT', '0') != '1':
     tmp1.clear()
 
     idx_type = typeof(np.empty(4, dtype=np.uint64))
-    bar_type = typeof(np.empty(1, dtype=DTYPE_SIGNAL_1m))
+    bar_type = typeof(np.empty(1, dtype=DTYPE_SIGNAL_1d))
     spec = [
         ('bars', typeof(tmp1)),
         ('index', uint64),

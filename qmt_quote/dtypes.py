@@ -1,5 +1,8 @@
 """
-保存文件时的格式
+内存映射文件格式
+
+1. 与从其他地方转存的数据格式不同
+2. 与实盘计算列不同
 """
 import numpy as np
 
@@ -7,11 +10,11 @@ DTYPE_STOCK_1t = np.dtype([
     ("stock_code", "U9"),
     ("now", np.uint64),  # 添加本地时间字段
     ("time", np.uint64),
-    ("lastPrice", np.float32),
+    ("lastPrice", np.float32),  # 最新价
     ("open", np.float32),
     ("high", np.float32),
     ("low", np.float32),
-    ("lastClose", np.float32),
+    ("lastClose", np.float32),  # 昨收价
     ("amount", np.float64),
     ("volume", np.uint64),
     # ("pvolume", np.uint64),  # pvolume不维护，因为askVol/bidVol推送过来的都是手,计算vwap时要留意
@@ -59,18 +62,40 @@ DTYPE_STOCK_1m = np.dtype([
     ("high", np.float32),
     ("low", np.float32),
     ("close", np.float32),
-    ("preClose", np.float32),
+    ("pre_close", np.float32),  # 昨收价。交易所发布
+    ("last_close", np.float32),  # 前收价
+    ("amount", np.float64),
+    ("volume", np.uint64),
+    ("total_amount", np.float64),
+    ("total_volume", np.uint64),
+    ("type", np.int8),  # InstrumentType
+],
+    align=True,
+)
+
+DTYPE_STOCK_1d = np.dtype([
+    ("stock_code", "U9"),
+    ("time", np.uint64),
+    ("open_dt", np.uint64),
+    ("close_dt", np.uint64),
+    ("open", np.float32),
+    ("high", np.float32),
+    ("low", np.float32),
+    ("close", np.float32),
+    ("pre_close", np.float32),  # 昨收价。交易所发布
     ("amount", np.float64),
     ("volume", np.uint64),
     ("type", np.int8),  # InstrumentType
-    # 分钟数据加入的字段，方便下单时直接取价格
-    ("avg_price", np.float32),
+    # 盘口
     ("askPrice_1", np.float32),
     ("bidPrice_1", np.float32),
     ("askVol_1", np.uint32),
     ("bidVol_1", np.uint32),
     ("askVol_2", np.uint32),
     ("bidVol_2", np.uint32),
+    # TODO 演示如何添加字段，只有历史，实盘不会对其更新
+    ("circulating_cap", np.float32),  # 流通股本
+    ("turnover_ratio", np.float32),  # 换手率
 ],
     align=True,
 )
@@ -79,22 +104,32 @@ DTYPE_SIGNAL_1t = np.dtype([
     ("stock_code", "U9"),
     ("time", np.uint64),
     ("strategy_id", np.int16),
-    ("float32", np.float32),
-    ("int32", np.int32),
-    ("boolean", np.bool),
+    ("f1", np.float32),
+    ("f2", np.float32),
+    ("f3", np.float32),
+    ("f4", np.float32),
+    ("f5", np.float32),
+    ("f6", np.float32),
+    ("f7", np.float32),
+    ("f8", np.float32),
 ],
     align=True,
 )
 
-DTYPE_SIGNAL_1m = np.dtype([
+DTYPE_SIGNAL_1d = np.dtype([
     ("stock_code", "U9"),
     ("time", np.uint64),
     ("strategy_id", np.int16),
     ("open_dt", np.uint64),
     ("close_dt", np.uint64),
-    ("float32", np.float32),
-    ("int32", np.int32),
-    ("boolean", np.bool),
+    ("f1", np.float32),
+    ("f2", np.float32),
+    ("f3", np.float32),
+    ("f4", np.float32),
+    ("f5", np.float32),
+    ("f6", np.float32),
+    ("f7", np.float32),
+    ("f8", np.float32),
 ],
     align=True,
 )

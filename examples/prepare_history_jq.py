@@ -33,9 +33,11 @@ def adjust(df):
 def save_1d(path, start_time, end_time):
     period = '1d'
     print(start_time, end_time, period)
-    df = pl.read_parquet(path, columns=['time', 'code', 'open', 'high', 'low', 'close', 'volume', 'money', 'pre_close', 'paused'])
+    df = pl.read_parquet(path, columns=['time', 'code', 'open', 'high', 'low', 'close', 'volume', 'money', 'pre_close', 'paused',
+                                        # TODO 按策略需求添加的字段
+                                        'circulating_cap', 'turnover_ratio'])
     df = df.filter(pl.col('time') >= start_time, pl.col('time') <= end_time)
-    df = adjust(df.rename({'pre_close': 'preClose', 'paused': 'suspendFlag', 'code': 'stock_code', 'money': 'amount'}))
+    df = adjust(df.rename({'paused': 'suspendFlag', 'code': 'stock_code', 'money': 'amount'}))
     print('沪深A股_1d===========')
     print(df.select(min_time=pl.min('time'), max_time=pl.max('time'), count=pl.count('time')))
     print(df.select(date=pl.col('time').dt.date()).group_by(by='date').agg(date=pl.last('date'), count=pl.count('date')).sort('date'))
@@ -73,17 +75,20 @@ def save_1m(path, start_time, end_time):
     df = df.with_columns(
         date=pl.col('time').dt.date().cast(pl.Datetime(time_unit='ms', time_zone='Asia/Shanghai')) - pl.duration(hours=8),
     )
+    # 计算总量
+    df = df.with_columns(
+        total_volume=pl.col('volume').cum_sum().over('stock_code', 'date', order_by='time'),
+        total_amount=pl.col('amount').cum_sum().over('stock_code', 'date', order_by='time'),
+    )
 
-    df_1d = pl.read_parquet(HISTORY_STOCK_1d, columns=['time', 'stock_code', 'preClose'])
-    # 注意：preClose是昨收，不是前收
+    df_1d = pl.read_parquet(HISTORY_STOCK_1d, columns=['time', 'stock_code', 'pre_close'])
+    # 注意：pre_close是昨收，不是前收
     df = df.join(df_1d, left_on=['stock_code', 'date'], right_on=['stock_code', 'time'])
     del df_1d
-
+    # 取前收盘价
     df = df.with_columns(
-        pre_close=pl.col('close').shift(1).over('stock_code', order_by='time'),
-    ).with_columns(
-        preClose=pl.when(pl.col('pre_close').is_null()).then(pl.col('preClose')).otherwise(pl.col('pre_close')),
-    ).drop('pre_close', 'date')
+        last_close=pl.col('close').shift(1, fill_value=pl.first('pre_close')).over('stock_code', order_by='time'),
+    )
 
     print('沪深A股_1m===========')
     print(df.select(min_time=pl.min('time'), max_time=pl.max('time'), count=pl.count('time')))

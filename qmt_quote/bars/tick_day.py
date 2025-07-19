@@ -16,8 +16,7 @@ from numba import uint64, float32, float64, uint32, typeof, int8
 from numba.experimental import jitclass
 from numba.typed.typeddict import Dict
 
-from qmt_quote.bars.labels import get_label_stock_1d
-from qmt_quote.dtypes import DTYPE_STOCK_1m
+from qmt_quote.dtypes import DTYPE_STOCK_1d
 
 
 class Bar:
@@ -34,7 +33,7 @@ class Bar:
         self.high: float = 0.
         self.low: float = 0.
         self.type: int = 0
-        self.avg_price: float = 0.
+
         self.askPrice_1: float = 0.
         self.bidPrice_1: float = 0.
         self.askVol_1: int = 0
@@ -43,8 +42,6 @@ class Bar:
         self.bidVol_2: int = 0
 
     def fill(self, arr: np.ndarray, stock_code: str) -> None:
-        """
-        """
         arr['stock_code'] = stock_code
         arr['time'] = self.time
         arr['open_dt'] = self.open_dt
@@ -53,11 +50,10 @@ class Bar:
         arr['high'] = self.high
         arr['low'] = self.low
         arr['close'] = self.close
-        arr['preClose'] = self.pre_close
+        arr['pre_close'] = self.pre_close
         arr['amount'] = self.amount
         arr['volume'] = self.volume
         arr['type'] = self.type
-        arr['avg_price'] = self.avg_price
 
         arr['askPrice_1'] = self.askPrice_1
         arr['bidPrice_1'] = self.bidPrice_1
@@ -90,9 +86,7 @@ class Bar:
         self.close = tick['lastPrice']
         self.amount = tick['amount']
         self.volume = tick['volume']
-        # TODO 不同类型可能不一样，先标记一下
-        if tick['volume'] > 0:
-            self.avg_price = tick['amount'] / tick['volume'] / 100
+
         self.askPrice_1 = tick['askPrice_1']
         self.bidPrice_1 = tick['bidPrice_1']
         self.askVol_1 = tick['askVol_1']
@@ -117,7 +111,7 @@ if os.environ.get('NUMBA_DISABLE_JIT', '0') != '1':
         ('amount', float64),
         ('volume', uint64),
         ('type', int8),
-        ('avg_price', float32),
+
         ('askPrice_1', float32),
         ('bidPrice_1', float32),
         ('askVol_1', uint32),
@@ -146,7 +140,7 @@ class BarManager:
         self.index = 0
         self.arr2[1] = 0
 
-    def extend(self, ticks: np.ndarray, get_label_arg1: int) -> Tuple[int, int, int]:
+    def extend(self, ticks: np.ndarray, get_label, get_label_arg1: int) -> Tuple[int, int, int]:
         """来ticks数据，更新bar数据
 
         tick不能重复，使用for_next()来获取
@@ -155,7 +149,7 @@ class BarManager:
         last_index = self.index
         for t in ticks:
             # TODO 时间戳请选用特别的格式
-            time = get_label_stock_1d(t['time'] // 1000, get_label_arg1) * 1000
+            time = get_label(t['time'] // 1000, get_label_arg1) * 1000
             stock_code = str(t['stock_code'])
             not_in = stock_code not in self.bars
             if not_in:
@@ -177,7 +171,7 @@ if os.environ.get('NUMBA_DISABLE_JIT', '0') != '1':
     tmp1.clear()
 
     idx_type = typeof(np.empty(4, dtype=np.uint64))
-    bar_type = typeof(np.empty(1, dtype=DTYPE_STOCK_1m))
+    bar_type = typeof(np.empty(1, dtype=DTYPE_STOCK_1d))
     spec = [
         ('bars', typeof(tmp1)),
         ('index', uint64),

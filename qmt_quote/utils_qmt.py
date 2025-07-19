@@ -89,7 +89,6 @@ def load_history_data(path: str, type: int = InstrumentType.Stock) -> pl.DataFra
         .with_columns(
             open_dt=pl.lit(0).cast(pl.UInt64),
             close_dt=pl.lit(0).cast(pl.UInt64),
-            avg_price=pl.lit(0),
             askPrice_1=pl.lit(0),
             bidPrice_1=pl.lit(0),
             askVol_1=pl.lit(0),
@@ -99,8 +98,8 @@ def load_history_data(path: str, type: int = InstrumentType.Stock) -> pl.DataFra
             type=pl.lit(type).cast(pl.UInt8),
         )
         .with_columns(
-            pl.col('open', 'high', 'low', 'close', 'preClose',
-                   "avg_price", "askPrice_1", "bidPrice_1").cast(pl.Float32),
+            pl.col('open', 'high', 'low', 'close', 'pre_close',
+                   "askPrice_1", "bidPrice_1").cast(pl.Float32),
             pl.col('amount').cast(pl.Float64),
             pl.col('volume').cast(pl.UInt64),
         )
@@ -108,7 +107,7 @@ def load_history_data(path: str, type: int = InstrumentType.Stock) -> pl.DataFra
     return df
 
 
-def last_factor(arr: np.ndarray, func, filter_last: bool, filter_label: float = 0, filter_exprs_pre=[]) -> pl.DataFrame:
+def last_factor(arr: np.ndarray, func, filter_last: bool, filter_label: float = 0, filter_exprs_pre=[], pre_close='per_close') -> pl.DataFrame:
     """获取最终因子值
 
     Parameters
@@ -130,7 +129,8 @@ def last_factor(arr: np.ndarray, func, filter_last: bool, filter_label: float = 
     # df = df.filter(pl.col('stock_code') == '600192.SH')
     df = cast_datetime(df, col=pl.col('time', 'open_dt', 'close_dt'))
     # 注意：时间没有转换成datetime类型
-    df = calc_factor1(df)
+    # df = df.sort('stock_code', 'time')
+    df = calc_factor1(df, pre_close=pre_close)
     df = df.with_columns([
         pl.col('stock_code').str.starts_with('60').alias('上海主板'),
         pl.col('stock_code').str.starts_with('00').alias('深圳主板'),

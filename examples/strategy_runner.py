@@ -12,16 +12,16 @@ from npyt import NPYT
 sys.path.insert(0, str(Path(__file__).parent))  # 当前目录
 sys.path.insert(0, str(Path(__file__).parent.parent))  # 上一级目录
 
-from examples.config import (FILE_d1m, FILE_d1d, FILE_d5m, FILE_s1t, FILE_s1d, BARS_PER_DAY, TOTAL_ASSET)
-from qmt_quote.bars.labels import get_label_stock_1d, get_label
+from examples.config import (FILE_d1m, FILE_d5m, FILE_d1d, FILE_s1t, FILE_s1d, BARS_PER_DAY, TOTAL_ASSET)
+from qmt_quote.bars.labels import get_label_stock_1d, get_label, get_traded_minutes__0900_1130__1300_1500
 from qmt_quote.bars.signals import BarManager as BarManagerS
-from qmt_quote.dtypes import DTYPE_SIGNAL_1t, DTYPE_SIGNAL_1m
+from qmt_quote.dtypes import DTYPE_SIGNAL_1t, DTYPE_SIGNAL_1d
 from qmt_quote.utils_qmt import last_factor
 
 # TODO 这里简单模拟了分钟因子和日线因子
-from examples.factor_calc import main as factor_func_1m  # noqa
-from examples.factor_calc import main as factor_func_5m  # noqa
-from examples.factor_calc import main as factor_func_1d  # noqa
+from examples.factor_calc_1m import main as factor_func_1m  # noqa
+# from examples.factor_calc import main as factor_func_5m  # noqa
+from examples.factor_calc_1d import main as factor_func_1d  # noqa
 
 # K线
 d1m = NPYT(FILE_d1m).load(mmap_mode="r")
@@ -33,7 +33,7 @@ STRATEGY_COUNT = 4
 # 顺序添加的信号
 s1t = NPYT(FILE_s1t, dtype=DTYPE_SIGNAL_1t).save(capacity=BARS_PER_DAY * STRATEGY_COUNT).load(mmap_mode="r+")
 # 日频信号
-s1d = NPYT(FILE_s1d, dtype=DTYPE_SIGNAL_1m).save(capacity=TOTAL_ASSET * STRATEGY_COUNT).load(mmap_mode="r+")
+s1d = NPYT(FILE_s1d, dtype=DTYPE_SIGNAL_1d).save(capacity=TOTAL_ASSET * STRATEGY_COUNT).load(mmap_mode="r+")
 
 # 重置信号位置
 s1t.clear()
@@ -48,14 +48,19 @@ pd.set_option('display.max_colwidth', None)
 TAIL_N = 120000
 
 
-def to_array(df: pl.DataFrame, strategy_id: int = 0) -> np.ndarray:
+def to_array_1d(df: pl.DataFrame, strategy_id: int = 0) -> np.ndarray:
     # TODO 注意：这部分的代码请根据自己实际策略进行调整
     arr = df.select(
         "stock_code", pl.col("time").cast(pl.UInt64),
         strategy_id=strategy_id,
-        float32=pl.col('入场价').cast(pl.Float32),
-        int32=pl.col('入场价').fill_null(0).cast(pl.Int32),
-        boolean=pl.col('SIGNAL2').cast(pl.Boolean),
+        f1=pl.col('SIGNAL1').cast(pl.Float32),
+        f2=pl.col('SIGNAL2').cast(pl.Float32),
+        f3=pl.col('SIGNAL3').cast(pl.Float32),
+        f4=pl.col('open').cast(pl.Float32),
+        f5=pl.col('量比').cast(pl.Float32),
+        f6=pl.col('turnover_ratio').cast(pl.Float32),
+        f7=pl.lit(0, dtype=pl.Float32),
+        f8=pl.lit(0, dtype=pl.Float32),
     ).select(DTYPE_SIGNAL_1t.names).to_numpy(structured=True)
 
     return arr
@@ -85,30 +90,34 @@ def main(curr_time: int) -> None:
     t1 = time.perf_counter()
 
     filter_exprs = ~pl.col('stock_code').str.starts_with('68')
+    traded_minutes = get_traded_minutes__0900_1130__1300_1500(curr_time, tz=3600 * 8)
+    print(traded_minutes)
 
-    # TODO 计算因子
-    df1m = last_factor(d1m.tail(TAIL_N), factor_func_1m, True, label_1m, filter_exprs)  # 1分钟线
-    df5m = last_factor(d5m.tail(TAIL_N), factor_func_5m, True, label_5m, filter_exprs)  # 5分钟线
-    df1d = last_factor(d1d.tail(TOTAL_ASSET * 120), factor_func_1d, True, label_1d, filter_exprs)  # 日线，要求当天K线是动态变化的
+    # TODO 计算因子。一定注意filter_last=True参数，否则s1d由于空间不足报错
+    df1d = last_factor(d1d.tail(TOTAL_ASSET * 120), factor_func_1d, True, label_1d, filter_exprs, pre_close='pre_close')  # 日线，要求当天K线是动态变化的
+    df1d = df1d.with_columns(
+        量比=pl.col('volume') / pl.col('过去5日平均每分钟成交量') / traded_minutes,
+    )
+    df1m = last_factor(d1m.tail(BARS_PER_DAY * 3), factor_func_1m, True, label_1m, filter_exprs, pre_close='last_close')  # 1分钟线
+    # df5m = last_factor(d5m.tail(TAIL_N), factor_func_5m, True, label_5m, filter_exprs)  # 5分钟线
     t2 = time.perf_counter()
 
     # 测试用，观察time/open_dt/close_dt
     # print(df1m.tail(1))
     # print(df5m.tail(1))
-    print(df1d.tail(1))
+    # print(df1d.tail(1))
 
-    # 将3个信号增量更新到内存文件映射
+    # 将3个信号增量更新到内存文件映射，只插入最新一个截面
     # s1t.append(to_array(df1m, strategy_id=1))
     # s1t.append(to_array(df5m, strategy_id=2))
-    s1t.append(to_array(df1d, strategy_id=3))
-
+    s1t.append(to_array_1d(df1d, strategy_id=3))
+    #
     # 内存文件映射读取
     start, end, step = bm_s1d.extend(s1t.read(n=BARS_PER_DAY), get_label_stock_1d, 3600 * 8)
     # 只显示最新的3条
     print(end, datetime.now(), t2 - t1)
-    print(s1d.tail(3))
     dd = pd.DataFrame(s1d.tail(TOTAL_ASSET))
-    print(dd[dd['boolean']])
+    print(dd[dd['f2'] == 1])
 
 
 if __name__ == "__main__":

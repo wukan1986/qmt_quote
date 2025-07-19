@@ -74,10 +74,10 @@ def ticks_to_minute(df: pl.DataFrame, every: str = "1m", closed: str = "left", l
             close=pl.last("lastPrice"),
             volume=pl.sum("volume_diff").cast(pl.UInt64),
             amount=pl.sum("amount_diff"),
-            preClose=pl.first("lastClose"),
+            pre_close=pl.first("lastClose"),
         )
         .with_columns(
-            preClose=pl.col("close").shift(1, fill_value=pl.col("preClose")).over('stock_code', order_by='time'),
+            pre_close=pl.col("close").shift(1, fill_value=pl.col("pre_close")).over('stock_code', order_by='time'),
         )
         .with_columns(duration=pl.col("close_dt") - pl.col("open_dt"))
     )
@@ -114,7 +114,7 @@ def ticks_to_day(df: pl.DataFrame) -> pl.DataFrame:
             close=pl.last("lastPrice"),
             volume=pl.last("volume"),
             amount=pl.last("amount"),
-            preClose=pl.first("lastClose"),
+            pre_close=pl.first("lastClose"),
         ).with_columns(duration=pl.col("close_dt") - pl.col("open_dt"))
     )
     return df
@@ -155,7 +155,10 @@ def convert_1m_to_5m(df: pl.DataFrame, every: str = "5m", closed: str = "right",
             close=pl.last("close"),
             volume=pl.sum("volume"),
             amount=pl.sum("amount"),
-            preClose=pl.first("preClose"),
+            total_volume=pl.last("total_volume"),
+            total_amount=pl.last("total_amount"),
+            pre_close=pl.first("pre_close"),
+            last_close=pl.first("last_close"),
             # 历史1分钟有这个字典，5分钟要补上
             suspendFlag=pl.last("suspendFlag"),
         )
