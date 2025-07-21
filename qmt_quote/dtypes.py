@@ -103,25 +103,9 @@ DTYPE_STOCK_1d = np.dtype([
 DTYPE_SIGNAL_1t = np.dtype([
     ("stock_code", "U9"),
     ("time", np.uint64),
-    ("strategy_id", np.int16),
-    ("f1", np.float32),
-    ("f2", np.float32),
-    ("f3", np.float32),
-    ("f4", np.float32),
-    ("f5", np.float32),
-    ("f6", np.float32),
-    ("f7", np.float32),
-    ("f8", np.float32),
-],
-    align=True,
-)
-
-DTYPE_SIGNAL_1d = np.dtype([
-    ("stock_code", "U9"),
-    ("time", np.uint64),
-    ("strategy_id", np.int16),
     ("open_dt", np.uint64),
     ("close_dt", np.uint64),
+    ("strategy_id", np.int16),
     ("f1", np.float32),
     ("f2", np.float32),
     ("f3", np.float32),

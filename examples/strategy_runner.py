@@ -15,7 +15,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))  # 上一级目录
 from examples.config import (FILE_d1m, FILE_d5m, FILE_d1d, FILE_s1t, FILE_s1d, BARS_PER_DAY, TOTAL_ASSET)
 from qmt_quote.bars.labels import get_label_stock_1d, get_label, get_traded_minutes__0900_1130__1300_1500
 from qmt_quote.bars.signals import BarManager as BarManagerS
-from qmt_quote.dtypes import DTYPE_SIGNAL_1t, DTYPE_SIGNAL_1d
+from qmt_quote.dtypes import DTYPE_SIGNAL_1t
 from qmt_quote.utils_qmt import last_factor
 
 # TODO 这里简单模拟了分钟因子和日线因子
@@ -33,7 +33,7 @@ STRATEGY_COUNT = 4
 # 顺序添加的信号
 s1t = NPYT(FILE_s1t, dtype=DTYPE_SIGNAL_1t).save(capacity=BARS_PER_DAY * STRATEGY_COUNT).load(mmap_mode="r+")
 # 日频信号
-s1d = NPYT(FILE_s1d, dtype=DTYPE_SIGNAL_1d).save(capacity=TOTAL_ASSET * STRATEGY_COUNT).load(mmap_mode="r+")
+s1d = NPYT(FILE_s1d, dtype=DTYPE_SIGNAL_1t).save(capacity=TOTAL_ASSET * STRATEGY_COUNT).load(mmap_mode="r+")
 
 # 重置信号位置
 s1t.clear()
@@ -51,7 +51,10 @@ TAIL_N = 120000
 def to_array_1d(df: pl.DataFrame, strategy_id: int = 0) -> np.ndarray:
     # TODO 注意：这部分的代码请根据自己实际策略进行调整
     arr = df.select(
-        "stock_code", pl.col("time").cast(pl.UInt64),
+        "stock_code",
+        pl.col("time").cast(pl.UInt64),
+        pl.col("open_dt").cast(pl.UInt64),
+        pl.col("close_dt").cast(pl.UInt64),
         strategy_id=strategy_id,
         f1=pl.col('SIGNAL1').cast(pl.Float32),
         f2=pl.col('SIGNAL2').cast(pl.Float32),

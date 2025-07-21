@@ -22,7 +22,7 @@ from numba import uint64, float32, typeof, int16
 from numba.experimental import jitclass
 from numba.typed.typeddict import Dict
 
-from qmt_quote.dtypes import DTYPE_SIGNAL_1d
+from qmt_quote.dtypes import DTYPE_SIGNAL_1t
 
 
 class Bar:
@@ -67,12 +67,12 @@ class Bar:
         if self.time != time:
             self.time = time
             is_new = True
-            self.open_dt = signal['time']
+            self.open_dt = signal['open_dt']  # TODO
             self.strategy_id = signal['strategy_id']
         else:
             is_new = False
 
-        self.close_dt = signal['time']
+        self.close_dt = signal['close_dt']  # TODO
         self.f1 = signal['f1']
         self.f2 = signal['f2']
         self.f3 = signal['f3']
@@ -156,7 +156,7 @@ if os.environ.get('NUMBA_DISABLE_JIT', '0') != '1':
     tmp1.clear()
 
     idx_type = typeof(np.empty(4, dtype=np.uint64))
-    bar_type = typeof(np.empty(1, dtype=DTYPE_SIGNAL_1d))
+    bar_type = typeof(np.empty(1, dtype=DTYPE_SIGNAL_1t))
     spec = [
         ('bars', typeof(tmp1)),
         ('index', uint64),
