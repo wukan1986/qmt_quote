@@ -25,7 +25,7 @@ from xtquant import xtdata
 sys.path.insert(0, str(Path(__file__).parent))  # 当前目录
 sys.path.insert(0, str(Path(__file__).parent.parent))  # 上一级目录
 
-from examples.config import HISTORY_STOCK_1d, HISTORY_INDEX_1d, HISTORY_STOCK_1m, DATA_DIR, HISTORY_STOCK_5m
+from examples.config import HISTORY_STOCK_1d, HISTORY_STOCK_1m, DATA_DIR, HISTORY_STOCK_5m
 from qmt_quote.bars.agg import convert_1m_to_5m
 from qmt_quote.utils_qmt import get_local_data_wrap
 
@@ -42,26 +42,37 @@ G.沪深指数 = xtdata.get_stock_list_in_sector("沪深指数")
 def save_1d(start_time, end_time):
     period = '1d'
     print(start_time, end_time, period)
-    df = get_local_data_wrap(G.沪深A股, period, start_time, end_time, data_dir=DATA_DIR)
+    df = get_local_data_wrap(G.沪深A股, period, start_time, end_time, data_dir=DATA_DIR).rename({'preClose': 'pre_close'})
+    df = df.with_columns(
+        circulating_cap=0,
+        turnover_ratio=0,
+    )
     print('沪深A股_1d===========')
     print(df.select(min_time=pl.min('time'), max_time=pl.max('time'), count=pl.count('time')))
     print(df.select(date=pl.col('time').dt.date()).group_by(by='date').agg(date=pl.last('date'), count=pl.count('date')).sort('date'))
     df.write_parquet(HISTORY_STOCK_1d)
 
-    # print(df)
-    df = get_local_data_wrap(G.沪深指数, period, start_time, end_time, data_dir=DATA_DIR)
-    print('沪深指数_1d===========')
-    print(df.select(min_time=pl.min('time'), max_time=pl.max('time'), count=pl.count('time')))
-    df.write_parquet(HISTORY_INDEX_1d)
-
 
 def save_1m(start_time, end_time):
     period = '1m'
     print(start_time, end_time, period)
-    df = get_local_data_wrap(G.沪深A股, period, start_time, end_time, data_dir=DATA_DIR)
+    # 这里
+    df = get_local_data_wrap(G.沪深A股, period, start_time, end_time, data_dir=DATA_DIR).rename({'preClose': 'last_close'})
     print('沪深A股_1m===========')
+    df = df.with_columns(
+        date=pl.col('time').dt.date().cast(pl.Datetime(time_unit='ms', time_zone='Asia/Shanghai')) - pl.duration(hours=8),
+    )
+    df = df.with_columns(
+        total_volume=pl.col('volume').cum_sum().over('stock_code', 'date', order_by='time'),
+        total_amount=pl.col('amount').cum_sum().over('stock_code', 'date', order_by='time'),
+    )
+    df_1d = pl.read_parquet(HISTORY_STOCK_1d, columns=['time', 'stock_code', 'pre_close'])
+    # 注意：pre_close是昨收，不是前收
+    df = df.join(df_1d, left_on=['stock_code', 'date'], right_on=['stock_code', 'time'])
+    del df_1d
     print(df.select(min_time=pl.min('time'), max_time=pl.max('time'), count=pl.count('time')))
     print(df.select(date=pl.col('time').dt.date()).group_by(by='date').agg(date=pl.last('date'), count=pl.count('date')).sort('date'))
+
     df.write_parquet(HISTORY_STOCK_1m)
 
 
@@ -83,7 +94,7 @@ if __name__ == "__main__":
     end_time = datetime.now() - timedelta(hours=15, minutes=30)
     end_time = end_time.strftime("%Y%m%d")
     # end_time = "20250213"  # 测试用，以后要注释
-
+    #
     # ==========
     # logger.info('开始转存数据。请根据自己策略预留一定长度的数据')
     start_time = datetime.now() - timedelta(days=180)

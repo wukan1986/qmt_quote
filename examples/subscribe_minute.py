@@ -63,6 +63,7 @@ def prepare_mmap(end_date: pl.datetime):
     his_stk_1m = his_stk_1m.filter(pl.col('time') < end_date)
     his_stk_5m = his_stk_5m.filter(pl.col('time') < end_date)
     his_stk_1d = his_stk_1d.filter(pl.col('time') < end_date)
+    print("!!! 历史数据截断时间 <", pl.select(end_date)[0, 0])
 
     # TODO 调整加载的历史数据量，注意有双休和节假日
     his_stk_1m = his_stk_1m.sort('time', 'stock_code').tail(BARS_PER_DAY * 3)
@@ -129,9 +130,10 @@ def do(file, is_live=False):
         # 这里要refresh，否则看起来行情延时很大
         pbar.set_description(f"延时 {now - t:8.3f}s", refresh=True)
 
-        bm_d1d.extend(a1t, get_label_stock_1d, 3600 * 8)
-        bm_d5m.extend(a1t, get_label_stock_5m, 3600 * 8)
-        bm_d1m.extend(a1t, get_label_stock_1m, 3600 * 8)
+        time_ns = time.time_ns()
+        bm_d1d.extend(time_ns, a1t, get_label_stock_1d, 3600 * 8)
+        bm_d5m.extend(time_ns, a1t, get_label_stock_5m, 3600 * 8)
+        bm_d1m.extend(time_ns, a1t, get_label_stock_1m, 3600 * 8)
 
 
 if __name__ == "__main__":
@@ -143,8 +145,8 @@ if __name__ == "__main__":
     # TODO 指定日期之前的数据从parquet中加载写入到内存文件映射
     # end_date = pl.datetime(2025, 5, 22, time_unit='ms', time_zone='Asia/Shanghai')
     end_date = pl.lit(datetime.now().date(), dtype=pl.Datetime(time_unit='ms', time_zone='Asia/Shanghai'))
-    # 使用今天之前的数据做历史。如果昨天的数据有问题，可以取更早一天，注意节假日
-    prepare_mmap(end_date=end_date - pl.duration(days=1))
+    # TODO 使用今天之前的数据做历史。如果昨天的数据有问题，可以取更早一天，注意节假日
+    prepare_mmap(end_date=end_date - pl.duration(days=0))
 
     # TODO 从指定文件加载tick数据，转换成日线和分钟
     FILE_d1t_list = [

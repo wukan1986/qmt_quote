@@ -7,4 +7,4 @@ tqdm
 expr_codegen>=0.14.0
 polars_ta
 xtquant
-npyt
+npyt>=0.4.0

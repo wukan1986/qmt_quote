@@ -122,7 +122,7 @@ class BarManager:
         self.index = 0
         self.arr2[1] = 0
 
-    def extend(self, ticks: np.ndarray, get_label, get_label_arg1: float) -> Tuple[int, int, int]:
+    def extend(self, time_ns: int, ticks: np.ndarray, get_label, get_label_arg1: float) -> Tuple[int, int, int]:
         """来ticks数据，更新bar数据
 
         tick不能重复，使用for_next()来获取
@@ -151,6 +151,7 @@ class BarManager:
             bb.fill(self.arr1[bb.index], stock_code)
         # 记录位子
         self.arr2[1] = self.index
+        self.arr2[2] = time_ns
         return last_index, self.index, self.index - last_index
 
 

@@ -6,6 +6,7 @@
 """
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
@@ -37,6 +38,19 @@ details = before_market_open(G)
 print("获取当天涨跌停价(含ST/退)：\n", details)
 details.to_parquet(FILE_details)
 
+
+def load_signal(s1d, now, sec=10):
+    arr = s1d.data()
+
+    arr = arr[arr['f2'] == 1]
+    arr = arr[arr['strategy_id'] == 3]
+    # 没行情了可能根据错误价格下单，这里过滤一下
+    dif = now - arr['close_dt'] / 1000
+    print(dif)
+    arr = arr[dif < sec]
+    return arr
+
+
 if __name__ == "__main__":
     print("demo test")
     callback = MyXtQuantTraderCallback()
@@ -56,6 +70,7 @@ if __name__ == "__main__":
     while True:
         print(":q 退出/0. 切换debug")
         print(f"1. 查资金/2. 查持仓/3. 查委托/4. 撤单/5. 下单({debug=})")
+        print(f"8. 循环下单")
         choice = input()
         if choice == ":q":
             break
@@ -86,25 +101,49 @@ if __name__ == "__main__":
             print(df)
             continue
         if choice == "5":
-            order_remark = input("请输入order_remark:")
-
-            df = send_orders_1(xt_trader, acc, details, d1d)
-
             # 等市值买入
-            arr = s1d.data()
-
-            arr = arr[arr['boolean']]
+            now = datetime.now().timestamp()
+            arr = load_signal(s1d, now, sec=86400)
             if arr.size == 0:
                 print("没有符合条件的股票")
                 continue
-            # TODO 条件过滤
-            arr = arr[arr['strategy_id'] == 1]
-            if arr.size == 0:
-                print("没有符合条件的策略")
-                continue
 
+            order_remark = input("请输入order_remark:")
+
+            df = send_orders_1(xt_trader, acc, details, d1d)
             df = send_orders_2(df, pd.DataFrame(arr), 0.05, or_volume=True)
 
             df = send_orders_3(xt_trader, acc, df, SizeType.TargetValuePercent)
-            df = send_orders_4(df, -1, 0, False)
+            df = send_orders_4(df, -1, -10, False)
             df = send_orders_5(xt_trader, acc, df, order_remark, debug=debug)
+        if choice == "8":
+            print("=====Ctrl+C中断当前循环=====")
+            try:
+                last_time = -1
+                while True:
+                    curr_time = s1d.timestamp()
+                    if curr_time == last_time:
+                        time.sleep(1)
+                        continue
+                    last_time = curr_time
+
+                    now = datetime.now()
+                    arr = load_signal(s1d, now.timestamp(), sec=15)
+                    if arr.size == 0:
+                        print(now, "没有符合条件的股票")
+                        continue
+
+                    print(now)
+                    order_remark = '1'
+                    df = cancel_orders(xt_trader, acc, orders=None, order_remark=None, do_async=False)
+
+                    df = send_orders_1(xt_trader, acc, details, d1d)
+                    df = send_orders_2(df, pd.DataFrame(arr), 0.05, or_volume=True)
+
+                    df = send_orders_3(xt_trader, acc, df, SizeType.TargetValuePercent)
+                    df = send_orders_4(df, -1, -20, False)
+                    df = send_orders_5(xt_trader, acc, df, order_remark, debug=debug)
+
+            except KeyboardInterrupt:
+                print("=====跳出子循环=====")
+                continue

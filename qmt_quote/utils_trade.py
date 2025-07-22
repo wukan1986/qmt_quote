@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Optional
 
 import numpy as np
@@ -138,7 +139,7 @@ def adjust_price_2(is_buy: bool, board_type: BoardType, price: float,
 @njit
 def adjust_price_3(is_buy: bool, price: float,
                    limit_down: float = 0.0, limit_up: float = 99999.0,
-                   ndigits: int = 100) -> float:
+                   ndigits: int = 1000) -> float:
     """买卖价不能超过涨跌停价
 
     Parameters
@@ -359,30 +360,38 @@ def before_market_open(G) -> pd.DataFrame:
     G.沪深A股 = xtdata.get_stock_list_in_sector("沪深A股")
     G.科创板 = xtdata.get_stock_list_in_sector("科创板")
     G.创业板 = xtdata.get_stock_list_in_sector("创业板")
+    G.沪深基金 = xtdata.get_stock_list_in_sector("沪深基金")
 
-    details = get_instrument_detail_wrap(G.沪深A股)
-    details['board_type'] = details.index.map(get_board_type)
+    details1 = get_instrument_detail_wrap(G.沪深A股)
+    details1['board_type'] = details1.index.map(get_board_type)
     # 由于 沪深风险警示 沪深退市整理, 数据为空，只好从股票名字中获取
-    details['is_st'] = details['InstrumentName'].str.contains('ST')
-    details['is_delisting'] = details['InstrumentName'].str.contains('退')
-    return details
+    details1['is_st'] = details1['InstrumentName'].str.contains('ST')
+    details1['is_delisting'] = details1['InstrumentName'].str.contains('退')
+
+    details2 = get_instrument_detail_wrap(G.沪深基金)
+    details2['board_type'] = details2.index.map(get_board_type)
+    # 由于 沪深风险警示 沪深退市整理, 数据为空，只好从股票名字中获取
+    details2['is_st'] = False
+    details2['is_delisting'] = False
+    return pd.concat([details1, details2])
 
 
 def send_orders_1(trader, account, details, npyt_obj: NPYT):
     """下单前准备工作第1步
 
-    1. 获取可卖出持仓数量
+    1. 获取可平持仓数量
     2. 获取涨跌价格
 
     Parameters
     ----------
     trader
     account
-    details: pd.DataFrame
+    details: pd.DataFrame 股票详情。来自于get_instrument_detail
         - stock_code:str (required)
         - board_type:int (required)
         - DownStopPrice:float (required)
         - UpStopPrice:float (required)
+    npyt_obj: NPYT 日行情内存映射文件
 
     Returns
     -------
@@ -390,8 +399,8 @@ def send_orders_1(trader, account, details, npyt_obj: NPYT):
         - can_use_volume:int (required)
         - bidPrice_1:float (required)
         - askPrice_1:float (required)
-        - lastPrice:float (required)
-        - lastClose:float (required)
+        - close:float (required)
+        - pre_close:float (required)
 
     Notes
     -----
@@ -404,17 +413,21 @@ def send_orders_1(trader, account, details, npyt_obj: NPYT):
 
     ticks = pd.DataFrame(npyt_obj.tail(TOTAL_ASSET)).drop_duplicates(
         subset=['stock_code'], keep='last').set_index('stock_code')
-    # volume与Position中重名，所以改一下。其他名字与get_full_tick相同
-    ticks.rename(columns={'close': 'lastPrice', 'preClose': 'lastClose', 'volume': 'VOLUME'}, inplace=True)
+    # volume与Position中重名，所以改一下
+    ticks.rename(columns={'volume': 'VOLUME'}, inplace=True)
     # 合并涨跌停
     df = pd.merge(details, ticks, left_index=True, right_index=True, how='left')
     # 获取可卖出持仓数量
     if (trader is not None) and (account is not None):
+        # 查询持仓
         positions = trader.query_stock_positions(account)
         if len(positions) > 0:
             positions = objs_to_dataframe(positions).set_index('stock_code')
+            # ETF基金被跳过了
             df = pd.merge(df, positions, left_index=True, right_index=True, how='left')
+            # 可平数量
             df['can_use_volume'] = df['can_use_volume'].fillna(0).astype(int)
+            # 持仓数量
             df['volume'] = df['volume'].fillna(0).astype(int)
 
     # position为空，将重要地方补全，后面会用到
@@ -426,7 +439,9 @@ def send_orders_1(trader, account, details, npyt_obj: NPYT):
     return df
 
 
-def send_orders_2(orders: pd.DataFrame, new_orders: pd.DataFrame, size: float = 0,
+def send_orders_2(orders: pd.DataFrame,
+                  new_orders: pd.DataFrame,
+                  size: float = 0,
                   or_volume: bool = True) -> pd.DataFrame:
     """过滤要交易的股票，并设置size
 
@@ -437,6 +452,8 @@ def send_orders_2(orders: pd.DataFrame, new_orders: pd.DataFrame, size: float = 
     ----------
     orders: pd.DataFrame
         - volume:int (required)
+    new_orders: pd.DataFrame
+        - size:float (required)
 
     Notes
     -----
@@ -445,7 +462,9 @@ def send_orders_2(orders: pd.DataFrame, new_orders: pd.DataFrame, size: float = 
     """
     # 设置size
     new_orders['size'] = size
+    # 这一步会导致部分数据由int变成了float
     orders = pd.merge(orders, new_orders, left_index=True, right_on="stock_code", how='left')
+    orders['strategy_id'] = orders['strategy_id'].fillna(0).astype(int)
 
     if or_volume:
         orders = orders[(orders['size'].notna()) | (orders['volume'] > 0)].copy()
@@ -501,7 +520,7 @@ def send_orders_3(trader, account, orders: pd.DataFrame, size_type: SizeType) ->
 
     orders['size'] = orders['size'].fillna(0)
     orders['volume'] = orders['volume'].fillna(0)
-    orders['lastPrice'] = orders['lastPrice'].fillna(0)
+    orders['close'] = orders['close'].fillna(0)
 
     if size_type == SizeType.TargetValueScale:
         orders['size'] = orders['size'] / orders['size'].abs().sum()
@@ -512,7 +531,7 @@ def send_orders_3(trader, account, orders: pd.DataFrame, size_type: SizeType) ->
 
     if size_type == SizeType.TargetValue:
         # 没有行情的股要注意
-        orders['size'] = orders['size'] - orders['lastPrice'] * orders['volume']
+        orders['size'] = orders['size'] - orders['close'] * orders['volume']
         size_type = SizeType.Value
 
     if size_type == SizeType.TargetAmount:
@@ -522,7 +541,7 @@ def send_orders_3(trader, account, orders: pd.DataFrame, size_type: SizeType) ->
 
     if size_type == SizeType.Value:
         # TODO 这里是否要修改成报单价？冻结资金和可开手术其实是按报单价算的
-        orders['size'] = orders['size'] / orders['lastPrice']
+        orders['size'] = orders['size'] / orders['close']
         size_type = SizeType.Amount
 
     if size_type == SizeType.Amount:
@@ -550,8 +569,8 @@ def send_orders_4(orders: pd.DataFrame, priority: int, offset: int, is_auction: 
         - UpStopPrice:float (required)
         - bidPrice_1:float (required)
         - askPrice_1:float (required)
-        - lastPrice:float (required)
-        - lastClose:float (required)
+        - close:float (required)
+        - pre_close:float (required)
         - is_buy:bool (required)
     priority:int
         报价激进或保守
@@ -573,16 +592,16 @@ def send_orders_4(orders: pd.DataFrame, priority: int, offset: int, is_auction: 
 
     # 根据需求设置下单价格
     orders['price'] = orders.apply(
-        lambda x: adjust_price_1(x.is_buy, priority, offset, x.bidPrice_1, x.askPrice_1, x.lastPrice, x.lastClose,
-                                 tick=0.01), axis=1)
+        lambda x: adjust_price_1(x.is_buy, priority, offset, x.bidPrice_1, x.askPrice_1, x.close, x.pre_close,
+                                 tick=x.PriceTick), axis=1)
     if not is_auction:
         # 价格笼子调整
         orders['price'] = orders.apply(
-            lambda x: adjust_price_2(x.is_buy, x.board_type, x.price, x.bidPrice_1, x.askPrice_1, x.lastPrice,
-                                     x.lastClose, tick=0.01), axis=1)
+            lambda x: adjust_price_2(x.is_buy, x.board_type, x.price, x.bidPrice_1, x.askPrice_1, x.close,
+                                     x.pre_close, tick=x.PriceTick), axis=1)
     # 涨跌停调整
     orders['price'] = orders.apply(
-        lambda x: adjust_price_3(x.is_buy, x.price, x.DownStopPrice, x.UpStopPrice, ndigits=100), axis=1)
+        lambda x: adjust_price_3(x.is_buy, x.price, x.DownStopPrice, x.UpStopPrice, ndigits=1000), axis=1)
 
     return orders
 
@@ -604,8 +623,6 @@ def send_orders_5(trader, account, orders: pd.DataFrame, order_remark: str, debu
         - can_use_volume:int (required)
         - size:float (required)
         - is_buy:bool (required)
-    strategy_name:str
-        策略名称
     order_remark:str
         备注
     debug:bool
@@ -635,11 +652,13 @@ def send_orders_5(trader, account, orders: pd.DataFrame, order_remark: str, debu
 
     orders['seq'] = 0
     orders.reset_index(inplace=True)
+    print('=' * 60)
+    orders['close_dt_y'] = orders['close_dt_y'].fillna(orders['close_dt_x'])
     for i, v in orders.iterrows():
         strategy_name = str(v['strategy_id'])
         value = v.price * v.order_volume
         print(
-            f'stock_code={v.stock_code},is_buy={v.is_buy},price={v.price},order_volume={v.order_volume},{strategy_name=},{order_remark=},{value=}')
+            f'close_dt={datetime.fromtimestamp(v.close_dt_y / 1000)},stock_code={v.stock_code},is_buy={v.is_buy},price={v.price},order_volume={v.order_volume},{strategy_name=},{order_remark=},{value=}')
 
         if not debug:
             orders.loc[i, 'seq'] = trader.order_stock_async(account, v.stock_code, v.order_type, v.order_volume,

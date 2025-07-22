@@ -107,25 +107,30 @@ def load_history_data(path: str, type: int = InstrumentType.Stock) -> pl.DataFra
     return df
 
 
-def last_factor(arr: np.ndarray, func, filter_last: bool, filter_label: float = 0, filter_exprs_pre=[], pre_close='per_close') -> pl.DataFrame:
-    """获取最终因子值
+def prepare_dataframe(arr: np.ndarray, filter_le: float = 0, filter_ge: float = 0, filter_exprs=[], pre_close='per_close') -> pl.DataFrame:
+    """准备数据
 
     Parameters
     ----------
     arr:
         当日分钟数据
-    filter_label:int
+    filter_le:int
         只取已经完成的K线数据。底层需要*1000转ms
+    filter_ge:float
+        只取大于等于某个时间的数据。如分种只取当天数据
     func
         因子计算函数
 
     """
     arr = arr[arr['type'] == InstrumentType.Stock]  # 过滤掉指数，只处理股票
-    if filter_label > 0:
-        arr = arr[arr['time'] <= filter_label]
+    # 秒转毫秒，因为qmt的时间戳是毫秒
+    if filter_le > 0:
+        arr = arr[arr['time'] <= filter_le * 1000]
+    if filter_ge > 0:
+        arr = arr[arr['time'] >= filter_ge * 1000]
     df = pl.from_numpy(arr)
     # 提前过滤票池，提高速度
-    df = df.filter(filter_exprs_pre)
+    df = df.filter(filter_exprs)
     # df = df.filter(pl.col('stock_code') == '600192.SH')
     df = cast_datetime(df, col=pl.col('time', 'open_dt', 'close_dt'))
     # 注意：时间没有转换成datetime类型
@@ -138,6 +143,4 @@ def last_factor(arr: np.ndarray, func, filter_last: bool, filter_label: float = 
         pl.col('stock_code').str.starts_with('30').alias('创业板'),
         (pl.col('stock_code').str.starts_with('8') | pl.col('stock_code').str.starts_with('4') | pl.col('stock_code').str.starts_with('9')).alias('北交所'),
     ])
-    if func is not None:
-        df = func(df, filter_last)
     return df

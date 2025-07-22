@@ -16,7 +16,7 @@ from examples.config import (FILE_d1m, FILE_d5m, FILE_d1d, FILE_s1t, FILE_s1d, B
 from qmt_quote.bars.labels import get_label_stock_1d, get_label, get_traded_minutes__0900_1130__1300_1500
 from qmt_quote.bars.signals import BarManager as BarManagerS
 from qmt_quote.dtypes import DTYPE_SIGNAL_1t
-from qmt_quote.utils_qmt import last_factor
+from qmt_quote.utils_qmt import prepare_dataframe
 
 # TODO 这里简单模拟了分钟因子和日线因子
 from examples.factor_calc_1m import main as factor_func_1m  # noqa
@@ -59,7 +59,7 @@ def to_array_1d(df: pl.DataFrame, strategy_id: int = 0) -> np.ndarray:
         f1=pl.col('SIGNAL1').cast(pl.Float32),
         f2=pl.col('SIGNAL2').cast(pl.Float32),
         f3=pl.col('SIGNAL3').cast(pl.Float32),
-        f4=pl.col('open').cast(pl.Float32),
+        f4=pl.col('昨入场价延后').cast(pl.Float32),
         f5=pl.col('量比').cast(pl.Float32),
         f6=pl.col('turnover_ratio').cast(pl.Float32),
         f7=pl.lit(0, dtype=pl.Float32),
@@ -85,10 +85,6 @@ def main(curr_time: int) -> None:
     print(datetime.fromtimestamp(label_1m))
     print(datetime.fromtimestamp(label_5m))
     print(datetime.fromtimestamp(label_1d))
-    # 秒转毫秒，因为qmt的时间戳是毫秒
-    label_1m *= 1000
-    label_5m *= 1000
-    label_1d *= 1000
 
     t1 = time.perf_counter()
 
@@ -97,12 +93,14 @@ def main(curr_time: int) -> None:
     print(traded_minutes)
 
     # TODO 计算因子。一定注意filter_last=True参数，否则s1d由于空间不足报错
-    df1d = last_factor(d1d.tail(TOTAL_ASSET * 120), factor_func_1d, True, label_1d, filter_exprs, pre_close='pre_close')  # 日线，要求当天K线是动态变化的
+    filter_last = True
+    df1d = prepare_dataframe(d1d.tail(TOTAL_ASSET * 120), label_1d, 0, filter_exprs, pre_close='pre_close')  # 日线，要求当天K线是动态变化的
+    df1d = factor_func_1d(df1d, filter_last)
     df1d = df1d.with_columns(
         量比=pl.col('volume') / pl.col('过去5日平均每分钟成交量') / traded_minutes,
     )
-    df1m = last_factor(d1m.tail(BARS_PER_DAY * 3), factor_func_1m, True, label_1m, filter_exprs, pre_close='last_close')  # 1分钟线
-    # df5m = last_factor(d5m.tail(TAIL_N), factor_func_5m, True, label_5m, filter_exprs)  # 5分钟线
+    df1m = prepare_dataframe(d1m.tail(BARS_PER_DAY * 3), label_1m, 0, filter_exprs, pre_close='last_close')  # 1分钟线
+    df1m = factor_func_1m(df1m, filter_last)
     t2 = time.perf_counter()
 
     # 测试用，观察time/open_dt/close_dt
@@ -116,11 +114,19 @@ def main(curr_time: int) -> None:
     s1t.append(to_array_1d(df1d, strategy_id=3))
     #
     # 内存文件映射读取
-    start, end, step = bm_s1d.extend(s1t.read(n=BARS_PER_DAY), get_label_stock_1d, 3600 * 8)
+    time_ns = time.time_ns()
+    start, end, step = bm_s1d.extend(time_ns, s1t.read(n=BARS_PER_DAY), get_label_stock_1d, 3600 * 8)
     # 只显示最新的3条
     print(end, datetime.now(), t2 - t1)
+    # dd = pl.from_numpy(s1d.tail(TOTAL_ASSET)).filter(pl.col('f2')==1)
+    # dd = cast_datetime(dd, col=pl.col('time', 'open_dt', 'close_dt'))
+    # print(dd.to_pandas())
     dd = pd.DataFrame(s1d.tail(TOTAL_ASSET))
-    print(dd[dd['f2'] == 1])
+    dd = dd[dd['f2'] == 1]
+    dd['time'] = pd.to_datetime(dd['time'], unit='ms') + pd.Timedelta(hours=8)
+    dd['open_dt'] = pd.to_datetime(dd['open_dt'], unit='ms') + pd.Timedelta(hours=8)
+    dd['close_dt'] = pd.to_datetime(dd['close_dt'], unit='ms') + pd.Timedelta(hours=8)
+    print(dd.reset_index(drop=True))
 
 
 if __name__ == "__main__":
