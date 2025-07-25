@@ -28,9 +28,9 @@ TOTAL_ASSET = 7000
 
 # 1分钟数据量。股票3秒更新一次
 TICKS_PER_MINUTE = int(60 / 3 * TOTAL_ASSET)
-TICKS_PER_DAY = TICKS_PER_MINUTE * 60 * 4
+TICKS_PER_DAY = int(TICKS_PER_MINUTE * 60 * 4.5)
 BARS_PER_MINUTE = TOTAL_ASSET  # 1分钟bar数量
-BARS_PER_DAY = TOTAL_ASSET * 60 * 4
+BARS_PER_DAY = int(TOTAL_ASSET * 60 * 4.5)
 
 # 数据长度
 # 注意：除了tick数据，其他数据转换都是numba实现的，没有边界检查，超范围会崩溃

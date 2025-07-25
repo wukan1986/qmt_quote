@@ -21,7 +21,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))  # 上一级目录
 from examples.config import FILE_d1t, TOTAL_1t
 from qmt_quote.dtypes import DTYPE_STOCK_1t
 from qmt_quote.enums import InstrumentType
-from qmt_quote.utils import ticks_to_dataframe, generate_code, input_with_timeout
+from qmt_quote.inputs import generate_code, input_with_timeout
+from qmt_quote.utils_tick import ticks_to_dataframe
 
 # 开盘前需要先更新板块数据，因为会有新股上市
 print("开始更新板块数据")

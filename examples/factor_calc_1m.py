@@ -24,11 +24,11 @@ from polars_ta.prefix.vec import *  # noqa
 DataFrame = TypeVar("DataFrame", _pl_LazyFrame, _pl_DataFrame)
 # ===================================
 
-_ = ["北交所", "close", "深圳主板", "vwap", "open", "最大涨幅限制", "high", "上海主板", "total_amount", "pre_close", "low", "科创板", "total_volume", "创业板", "factor2"]
-[北交所, close, 深圳主板, vwap, open, 最大涨幅限制, high, 上海主板, total_amount, pre_close, low, 科创板, total_volume, 创业板, factor2] = [pl.col(i) for i in _]
+_ = ["vwap", "深圳主板", "low", "pre_close", "科创板", "total_volume", "过去5日平均每分钟成交量", "factor2", "北交所", "close", "上海主板", "total_amount", "最大涨幅限制", "close_dt", "open", "创业板", "high"]
+[vwap, 深圳主板, low, pre_close, 科创板, total_volume, 过去5日平均每分钟成交量, factor2, 北交所, close, 上海主板, total_amount, 最大涨幅限制, close_dt, open, 创业板, high] = [pl.col(i) for i in _]
 
-_ = ["OPEN", "HIGH", "LOW", "CLOSE", "VWAP", "high_limit", "low_limit"]
-[OPEN, HIGH, LOW, CLOSE, VWAP, high_limit, low_limit] = [pl.col(i) for i in _]
+_ = ["OPEN", "HIGH", "LOW", "CLOSE", "量比", "VWAP", "high_limit", "low_limit"]
+[OPEN, HIGH, LOW, CLOSE, 量比, VWAP, high_limit, low_limit] = [pl.col(i) for i in _]
 
 _DATE_ = "time"
 _ASSET_ = "stock_code"
@@ -53,6 +53,7 @@ def func_0_cl(df: DataFrame) -> DataFrame:
         LOW=factor2 * low,
         CLOSE=close * factor2,
         最大涨幅限制=if_else(北交所, 0.3, 0) + if_else(上海主板 | 深圳主板, 0.1, 0) + if_else(创业板 | 科创板, 0.2, 0),
+        量比=total_volume / (过去5日平均每分钟成交量 * FROMOPEN_1(close_dt, 0)),
     )
     # ========================================
     df = df.with_columns(
@@ -71,6 +72,7 @@ HIGH = factor2*high #
 LOW = factor2*low #
 CLOSE = close*factor2 #
 最大涨幅限制 = if_else(北交所, 0.3, 0) + if_else(上海主板 | 深圳主板, 0.1, 0) + if_else(创业板 | 科创板, 0.2, 0) #
+量比 = total_volume/(过去5日平均每分钟成交量*FROMOPEN_1(close_dt, 0)) #
 #========================================func_0_cl
 VWAP = factor2*vwap #
 high_limit = round_(pre_close*(最大涨幅限制 + 1), 2) #
@@ -87,6 +89,7 @@ CLOSE = close*factor2 #
 最大涨幅限制 = if_else(北交所, 0.3, 0) + if_else(上海主板 | 深圳主板, 0.1, 0) + if_else(创业板 | 科创板, 0.2, 0) #
 high_limit = round_(pre_close*(最大涨幅限制 + 1), 2) #
 low_limit = round_(pre_close*(1 - 最大涨幅限制), 2) #
+量比 = total_volume/(过去5日平均每分钟成交量*FROMOPEN_1(close_dt, 0)) #
 """
 
 

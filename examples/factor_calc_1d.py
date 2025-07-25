@@ -24,11 +24,11 @@ from polars_ta.prefix.vec import *  # noqa
 DataFrame = TypeVar("DataFrame", _pl_LazyFrame, _pl_DataFrame)
 # ===================================
 
-_ = ["open", "创业板", "SIGNAL1", "amount", "最大涨幅限制", "vwap", "high", "收盘涨跌", "low", "CLOSE", "factor2", "HIGH", "深圳主板", "收盘涨停", "上海主板", "volume", "high_limit", "最高涨跌", "科创板", "北交所", "pre_close", "close", "circulating_cap"]
-[open, 创业板, SIGNAL1, amount, 最大涨幅限制, vwap, high, 收盘涨跌, low, CLOSE, factor2, HIGH, 深圳主板, 收盘涨停, 上海主板, volume, high_limit, 最高涨跌, 科创板, 北交所, pre_close, close, circulating_cap] = [pl.col(i) for i in _]
+_ = ["科创板", "pre_close", "vwap", "low", "HIGH", "最高涨跌", "上海主板", "close_dt", "amount", "创业板", "CLOSE", "SIGNAL1", "close", "深圳主板", "open", "factor2", "北交所", "high", "过去5日平均每分钟成交量", "volume", "最大涨幅限制", "收盘涨停", "circulating_cap", "high_limit", "收盘涨跌"]
+[科创板, pre_close, vwap, low, HIGH, 最高涨跌, 上海主板, close_dt, amount, 创业板, CLOSE, SIGNAL1, close, 深圳主板, open, factor2, 北交所, high, 过去5日平均每分钟成交量, volume, 最大涨幅限制, 收盘涨停, circulating_cap, high_limit, 收盘涨跌] = [pl.col(i) for i in _]
 
-_ = ["OPEN", "LOW", "缩量", "过去5日平均每分钟成交量", "turnover_ratio", "_x_3", "VWAP", "low_limit", "_x_0", "SIGNAL2", "SIGNAL3"]
-[OPEN, LOW, 缩量, 过去5日平均每分钟成交量, turnover_ratio, _x_3, VWAP, low_limit, _x_0, SIGNAL2, SIGNAL3] = [pl.col(i) for i in _]
+_ = ["OPEN", "LOW", "turnover_ratio", "缩量", "_x_3", "VWAP", "low_limit", "量比", "_x_0", "SIGNAL2", "SIGNAL3"]
+[OPEN, LOW, turnover_ratio, 缩量, _x_3, VWAP, low_limit, 量比, _x_0, SIGNAL2, SIGNAL3] = [pl.col(i) for i in _]
 
 _DATE_ = "time"
 _ASSET_ = "stock_code"
@@ -60,9 +60,9 @@ def func_0_cl(df: DataFrame) -> DataFrame:
 def func_0_ts__stock_code(df: DataFrame) -> DataFrame:
     # ========================================
     df = df.with_columns(
-        缩量=(ts_returns(volume) < -0.1).over(volume.is_not_null(), _ASSET_, order_by=_DATE_),
-        过去5日平均每分钟成交量=(ts_delay(ts_sum(volume, 5), 1) / 1200).over(volume.is_not_null(), _ASSET_, order_by=_DATE_),
         turnover_ratio=(volume / ts_delay(circulating_cap, 1)).over(pl.all_horizontal(volume.is_not_null(), circulating_cap.is_not_null()), _ASSET_, order_by=_DATE_),
+        过去5日平均每分钟成交量=(ts_delay(ts_sum(volume, 5), 1) / 1200).over(volume.is_not_null(), _ASSET_, order_by=_DATE_),
+        缩量=(ts_returns(volume) < -0.1).over(volume.is_not_null(), _ASSET_, order_by=_DATE_),
     )
     # ========================================
     df = df.with_columns(
@@ -77,6 +77,7 @@ def func_1_cl(df: DataFrame) -> DataFrame:
         VWAP=factor2 * vwap,
         high_limit=round_(pre_close * (最大涨幅限制 + 1), 2),
         low_limit=round_(-pre_close * (最大涨幅限制 - 1), 2),
+        量比=volume / (过去5日平均每分钟成交量 * FROMOPEN_1(close_dt, 60)),
     )
     # ========================================
     df = df.with_columns(
@@ -94,12 +95,12 @@ def func_1_cl(df: DataFrame) -> DataFrame:
 def func_2_ts__stock_code(df: DataFrame) -> DataFrame:
     # ========================================
     df = df.with_columns(
-        SIGNAL1=(ts_shifts_v3(_x_0, 0, 6, _x_0, 1, 1, 收盘涨停, 1, 3, _x_0, 1, 1)).over(pl.all_horizontal(_x_0.is_not_null(), 收盘涨停.is_not_null()), _ASSET_, order_by=_DATE_),
+        SIGNAL1=(ts_shifts_v3(_x_0, 0, 6, _x_0, 1, 1, 收盘涨停, 1, 3, _x_0, 1, 1)).over(pl.all_horizontal(收盘涨停.is_not_null(), _x_0.is_not_null()), _ASSET_, order_by=_DATE_),
     )
     # ========================================
     df = df.with_columns(
-        SIGNAL2=(ts_shifts_v1(最高涨跌 > 0, SIGNAL1)).over(pl.all_horizontal(SIGNAL1.is_not_null(), 最高涨跌.is_not_null()), _ASSET_, order_by=_DATE_),
-        SIGNAL3=(ts_shifts_v1(收盘涨跌 > 0, SIGNAL1)).over(pl.all_horizontal(收盘涨跌.is_not_null(), SIGNAL1.is_not_null()), _ASSET_, order_by=_DATE_),
+        SIGNAL2=(ts_shifts_v1(最高涨跌 > 0, SIGNAL1)).over(pl.all_horizontal(最高涨跌.is_not_null(), SIGNAL1.is_not_null()), _ASSET_, order_by=_DATE_),
+        SIGNAL3=(ts_shifts_v1(收盘涨跌 > 0, SIGNAL1)).over(pl.all_horizontal(SIGNAL1.is_not_null(), 收盘涨跌.is_not_null()), _ASSET_, order_by=_DATE_),
     )
     return df
 
@@ -113,15 +114,16 @@ LOW = factor2*low #
 CLOSE = close*factor2 #
 最大涨幅限制 = if_else(北交所, 0.3, 0) + if_else(上海主板 | 深圳主板, 0.1, 0) + if_else(创业板 | 科创板, 0.2, 0) #
 #========================================func_0_ts__stock_code
-缩量 = ts_returns(volume) < -0.1 #
-过去5日平均每分钟成交量 = ts_delay(ts_sum(volume, 5), 1)/1200 #
 turnover_ratio = volume/ts_delay(circulating_cap, 1) # 流通股本单位为万股,要换成手,*100转成%，直接省去了/10000
+过去5日平均每分钟成交量 = ts_delay(ts_sum(volume, 5), 1)/1200 #
+缩量 = ts_returns(volume) < -0.1 #
 #========================================func_0_ts__stock_code
 _x_3 = 1/ts_delay(CLOSE, 1) #
 #========================================func_1_cl
 VWAP = factor2*vwap #
 high_limit = round_(pre_close*(最大涨幅限制 + 1), 2) #
 low_limit = round_(-pre_close*(最大涨幅限制 - 1), 2) #
+量比 = volume/(过去5日平均每分钟成交量*FROMOPEN_1(close_dt, 60)) #
 #========================================func_1_cl
 最高涨跌 = HIGH*_x_3 - 1 #
 收盘涨跌 = CLOSE*_x_3 - 1 #
@@ -145,12 +147,13 @@ CLOSE = close*factor2 #
 最大涨幅限制 = if_else(北交所, 0.3, 0) + if_else(上海主板 | 深圳主板, 0.1, 0) + if_else(创业板 | 科创板, 0.2, 0) #
 high_limit = round_(pre_close*(最大涨幅限制 + 1), 2) #
 low_limit = round_(pre_close*(1 - 最大涨幅限制), 2) #
+turnover_ratio = volume/ts_delay(circulating_cap, 1) # 流通股本单位为万股,要换成手,*100转成%，直接省去了/10000
+过去5日平均每分钟成交量 = ts_delay(ts_sum(volume, 5), 1)/((240*5)) #
+量比 = volume/(过去5日平均每分钟成交量*FROMOPEN_1(close_dt, 60)) #
 收盘涨停 = close >= high_limit - 1*0.001 #
 最高涨跌 = HIGH/ts_delay(CLOSE, 1) - 1*1 #
 收盘涨跌 = CLOSE/ts_delay(CLOSE, 1) - 1*1 #
 缩量 = ts_returns(volume) < -0.1 #
-过去5日平均每分钟成交量 = ts_delay(ts_sum(volume, 5), 1)/((240*5)) #
-turnover_ratio = volume/ts_delay(circulating_cap, 1) # 流通股本单位为万股,要换成手,*100转成%，直接省去了/10000
 SIGNAL1 = ts_shifts_v3(~收盘涨停, 0, 6, ~收盘涨停, 1, 1, 收盘涨停, 1, 3, ~收盘涨停, 1, 1) #
 SIGNAL2 = ts_shifts_v1(最高涨跌 > 0, SIGNAL1) #
 SIGNAL3 = ts_shifts_v1(收盘涨跌 > 0, SIGNAL1) #

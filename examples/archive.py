@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).parent))  # 当前目录
 sys.path.insert(0, str(Path(__file__).parent.parent))  # 上一级目录
 
 from config import FILE_d1t, BACKUP_DIR
-from qmt_quote.utils import generate_code
+from qmt_quote.inputs import generate_code
 
 if __name__ == "__main__":
     print("=" * 60)

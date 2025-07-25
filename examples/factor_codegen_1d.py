@@ -22,15 +22,16 @@ def _code_block_1():
     high_limit = round_(pre_close * (1 + 最大涨幅限制), 2)
     low_limit = round_(pre_close * (1 - 最大涨幅限制), 2)
 
+    turnover_ratio = volume / circulating_cap[1]  # 流通股本单位为万股,要换成手,*100转成%，直接省去了/10000
+    过去5日平均每分钟成交量 = ts_sum(volume, 5)[1] / (240 * 5)
+    量比 = volume / 过去5日平均每分钟成交量 / FROMOPEN_1(close_dt, 60)
+
     收盘涨停 = close >= high_limit - 0.001
 
     最高涨跌 = HIGH / CLOSE[1] - 1
     收盘涨跌 = CLOSE / CLOSE[1] - 1
 
     缩量 = ts_returns(volume) < -0.1
-
-    过去5日平均每分钟成交量 = ts_sum(volume, 5)[1] / (240 * 5)
-    turnover_ratio = volume / circulating_cap[1]  # 流通股本单位为万股,要换成手,*100转成%，直接省去了/10000
 
     # 盘前筛选。可减少计算压力 358
     SIGNAL1 = ts_shifts_v3(~收盘涨停, 0, 6, ~收盘涨停, 1, 1, 收盘涨停, 1, 3, ~收盘涨停, 1, 1)

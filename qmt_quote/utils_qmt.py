@@ -12,7 +12,8 @@ from tqdm import tqdm
 from xtquant import xtdata
 
 from qmt_quote.enums import InstrumentType
-from qmt_quote.utils import cast_datetime, concat_dataframes_from_dict, ticks_to_dataframe, calc_factor1
+from qmt_quote.utils import cast_datetime, concat_dataframes_from_dict, calc_factor1
+from qmt_quote.utils_tick import ticks_to_dataframe
 
 
 def download_history_data2_wrap(desc: str, stock_list: List[str], period: str, start_time: str, end_time: str) -> None:

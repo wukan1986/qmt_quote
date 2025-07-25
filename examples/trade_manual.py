@@ -138,7 +138,7 @@ if __name__ == "__main__":
                     df = cancel_orders(xt_trader, acc, orders=None, order_remark=None, do_async=False)
 
                     df = send_orders_1(xt_trader, acc, details, d1d)
-                    df = send_orders_2(df, pd.DataFrame(arr), 0.05, or_volume=True)
+                    df = send_orders_2(df, pd.DataFrame(arr), 0.05, or_volume=False)
 
                     df = send_orders_3(xt_trader, acc, df, SizeType.TargetValuePercent)
                     df = send_orders_4(df, -1, -20, False)

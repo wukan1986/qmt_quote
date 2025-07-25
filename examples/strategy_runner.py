@@ -13,7 +13,7 @@ sys.path.insert(0, str(Path(__file__).parent))  # 当前目录
 sys.path.insert(0, str(Path(__file__).parent.parent))  # 上一级目录
 
 from examples.config import (FILE_d1m, FILE_d5m, FILE_d1d, FILE_s1t, FILE_s1d, BARS_PER_DAY, TOTAL_ASSET)
-from qmt_quote.bars.labels import get_label_stock_1d, get_label, get_traded_minutes__0900_1130__1300_1500
+from qmt_quote.bars.labels import get_label_stock_1d, get_label
 from qmt_quote.bars.signals import BarManager as BarManagerS
 from qmt_quote.dtypes import DTYPE_SIGNAL_1t
 from qmt_quote.utils_qmt import prepare_dataframe
@@ -61,8 +61,8 @@ def to_array_1d(df: pl.DataFrame, strategy_id: int = 0) -> np.ndarray:
         f3=pl.col('SIGNAL3').cast(pl.Float32),
         f4=pl.col('昨入场价延后').cast(pl.Float32),
         f5=pl.col('量比').cast(pl.Float32),
-        f6=pl.col('turnover_ratio').cast(pl.Float32),
-        f7=pl.lit(0, dtype=pl.Float32),
+        f6=pl.lit(0, dtype=pl.Float32),
+        f7=pl.col('turnover_ratio').cast(pl.Float32),
         f8=pl.lit(0, dtype=pl.Float32),
     ).select(DTYPE_SIGNAL_1t.names).to_numpy(structured=True)
 
@@ -89,17 +89,16 @@ def main(curr_time: int) -> None:
     t1 = time.perf_counter()
 
     filter_exprs = ~pl.col('stock_code').str.starts_with('68')
-    traded_minutes = get_traded_minutes__0900_1130__1300_1500(curr_time, tz=3600 * 8)
-    print(traded_minutes)
 
     # TODO 计算因子。一定注意filter_last=True参数，否则s1d由于空间不足报错
     filter_last = True
     df1d = prepare_dataframe(d1d.tail(TOTAL_ASSET * 120), label_1d, 0, filter_exprs, pre_close='pre_close')  # 日线，要求当天K线是动态变化的
     df1d = factor_func_1d(df1d, filter_last)
-    df1d = df1d.with_columns(
-        量比=pl.col('volume') / pl.col('过去5日平均每分钟成交量') / traded_minutes,
+    df1m = prepare_dataframe(d1m.tail(BARS_PER_DAY * 3), label_1m, label_1d, filter_exprs, pre_close='last_close')  # 1分钟线
+    df1m = df1m.with_columns(
+        date=pl.col('time').dt.date().cast(pl.Datetime(time_unit='ms', time_zone='Asia/Shanghai')) - pl.duration(hours=8),
     )
-    df1m = prepare_dataframe(d1m.tail(BARS_PER_DAY * 3), label_1m, 0, filter_exprs, pre_close='last_close')  # 1分钟线
+    df1m = df1m.join(df1d.select('stock_code', 'time', '过去5日平均每分钟成交量'), left_on=['stock_code', 'date'], right_on=['stock_code', 'time'])
     df1m = factor_func_1m(df1m, filter_last)
     t2 = time.perf_counter()
 

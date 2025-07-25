@@ -19,15 +19,16 @@ from polars_ta.prefix.tdx import *  # noqa
 from polars_ta.prefix.ta import *  # noqa
 from polars_ta.prefix.wq import *  # noqa
 from polars_ta.prefix.cdl import *  # noqa
+from polars_ta.prefix.vec import *  # noqa
 
 DataFrame = TypeVar("DataFrame", _pl_LazyFrame, _pl_DataFrame)
 # ===================================
 
-_ = ["volume", "北交所", "上海主板", "low", "最大涨幅限制", "科创板", "high", "B", "创业板", "open", "vwap", "深圳主板", "amount", "preClose", "factor2", "A", "CLOSE", "close"]
-[volume, 北交所, 上海主板, low, 最大涨幅限制, 科创板, high, B, 创业板, open, vwap, 深圳主板, amount, preClose, factor2, A, CLOSE, close] = [pl.col(i) for i in _]
+_ = ["A", "北交所", "科创板", "low", "vwap", "factor2", "深圳主板", "preClose", "high", "最大涨幅限制", "创业板", "amount", "CLOSE", "open", "close", "上海主板", "B", "volume"]
+[A, 北交所, 科创板, low, vwap, factor2, 深圳主板, preClose, high, 最大涨幅限制, 创业板, amount, CLOSE, open, close, 上海主板, B, volume] = [pl.col(i) for i in _]
 
-_ = ["OPEN", "HIGH", "LOW", "VWAP", "high_limit", "low_limit", "MA5", "MA10", "OUT"]
-[OPEN, HIGH, LOW, VWAP, high_limit, low_limit, MA5, MA10, OUT] = [pl.col(i) for i in _]
+_ = ["OPEN", "HIGH", "LOW", "过去5日平均每分钟成交量", "MA5", "MA10", "VWAP", "high_limit", "low_limit", "OUT"]
+[OPEN, HIGH, LOW, 过去5日平均每分钟成交量, MA5, MA10, VWAP, high_limit, low_limit, OUT] = [pl.col(i) for i in _]
 
 _DATE_ = "time"
 _ASSET_ = "stock_code"
@@ -53,21 +54,29 @@ def func_0_cl(df: DataFrame) -> DataFrame:
         CLOSE=close * factor2,
         最大涨幅限制=if_else(北交所, 0.3, 0) + if_else(上海主板 | 深圳主板, 0.1, 0) + if_else(创业板 | 科创板, 0.2, 0),
     )
-    # ========================================
-    df = df.with_columns(
-        VWAP=factor2 * vwap,
-        high_limit=preClose * (最大涨幅限制 + 1),
-        low_limit=-preClose * (最大涨幅限制 - 1),
-    )
     return df
 
 
-def func_1_ts__stock_code(df: DataFrame) -> DataFrame:
+def func_0_ts__stock_code(df: DataFrame) -> DataFrame:
+    # ========================================
+    df = df.with_columns(
+        过去5日平均每分钟成交量=(ts_delay(ts_sum(volume, 5), 1) / 1200).over(volume.is_not_null(), _ASSET_, order_by=_DATE_),
+    )
     # ========================================
     df = df.with_columns(
         MA5=(ts_mean(CLOSE, 5)).over(CLOSE.is_not_null(), _ASSET_, order_by=_DATE_),
         MA10=(ts_mean(CLOSE, 10)).over(CLOSE.is_not_null(), _ASSET_, order_by=_DATE_),
         A=(ts_returns(CLOSE, 5)).over(CLOSE.is_not_null(), _ASSET_, order_by=_DATE_),
+    )
+    return df
+
+
+def func_1_cl(df: DataFrame) -> DataFrame:
+    # ========================================
+    df = df.with_columns(
+        VWAP=factor2 * vwap,
+        high_limit=preClose * (最大涨幅限制 + 1),
+        low_limit=-preClose * (最大涨幅限制 - 1),
     )
     return df
 
@@ -96,14 +105,16 @@ HIGH = factor2*high #
 LOW = factor2*low #
 CLOSE = close*factor2 #
 最大涨幅限制 = if_else(北交所, 0.3, 0) + if_else(上海主板 | 深圳主板, 0.1, 0) + if_else(创业板 | 科创板, 0.2, 0) #
-#========================================func_0_cl
-VWAP = factor2*vwap #
-high_limit = preClose*(最大涨幅限制 + 1) #
-low_limit = -preClose*(最大涨幅限制 - 1) #
-#========================================func_1_ts__stock_code
+#========================================func_0_ts__stock_code
+过去5日平均每分钟成交量 = ts_delay(ts_sum(volume, 5), 1)/1200 #
+#========================================func_0_ts__stock_code
 MA5 = ts_mean(CLOSE, 5) #
 MA10 = ts_mean(CLOSE, 10) #
 A = ts_returns(CLOSE, 5) #
+#========================================func_1_cl
+VWAP = factor2*vwap #
+high_limit = preClose*(最大涨幅限制 + 1) #
+low_limit = -preClose*(最大涨幅限制 - 1) #
 #========================================func_2_cs__time
 B = cs_rank(-A, _FALSE_) #
 #========================================func_3_cl
@@ -120,6 +131,7 @@ CLOSE = close*factor2 #
 最大涨幅限制 = if_else(北交所, 0.3, 0) + if_else(上海主板 | 深圳主板, 0.1, 0) + if_else(创业板 | 科创板, 0.2, 0) #
 high_limit = preClose*(最大涨幅限制 + 1) #
 low_limit = preClose*(1 - 最大涨幅限制) #
+过去5日平均每分钟成交量 = ts_delay(ts_sum(volume, 5), 1)/((240*5)) #
 MA5 = ts_mean(CLOSE, 5) #
 MA10 = ts_mean(CLOSE, 10) #
 A = ts_returns(CLOSE, 5) #
@@ -128,21 +140,25 @@ OUT = B <= 5 #
 """
 
 
-def filter_last(df: DataFrame) -> DataFrame:
+def _filter_last(df: DataFrame, filter_last: bool) -> DataFrame:
     """过滤数据，只取最后一天。实盘时可用于减少计算量
     前一个调用的ts,这里可以直接调用，可以认为已经排序好
         `df = filter_last(df)`
     反之
         `df = filter_last(df.sort(_DATE_))`
     """
-    return df.filter(pl.col(_DATE_) >= df.select(pl.last(_DATE_))[0, 0])
+    if filter_last:
+        return df.filter(pl.col(_DATE_) >= df.select(pl.last(_DATE_))[0, 0])
+    else:
+        return df
 
 
-def main(df: DataFrame) -> DataFrame:
+def main(df: DataFrame, filter_last: bool) -> DataFrame:
 
     df = func_0_cl(df).drop(*[])
-    df = func_1_ts__stock_code(df.sort(_ASSET_, _DATE_)).drop(*[])
-    df = filter_last(df)
+    df = func_0_ts__stock_code(df.sort(_ASSET_, _DATE_)).drop(*[])
+    df = _filter_last(df, filter_last)
+    df = func_1_cl(df).drop(*[])
     df = func_2_cs__time(df.sort(_DATE_)).drop(*[])
     df = func_3_cl(df).drop(*[])
 

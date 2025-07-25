@@ -22,6 +22,8 @@ def _code_block_1():
     high_limit = round_(pre_close * (1 + 最大涨幅限制), 2)
     low_limit = round_(pre_close * (1 - 最大涨幅限制), 2)
 
+    量比 = total_volume / 过去5日平均每分钟成交量 / FROMOPEN_1(close_dt, 0)
+
 
 df = None
 df = codegen_exec(df, _code_block_1, asset='stock_code', date='time', output_file='factor_calc_1m.py',

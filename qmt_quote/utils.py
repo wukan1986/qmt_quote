@@ -2,11 +2,7 @@
 与交易平台无关的工具函数
 
 """
-import queue
-import random
-import string
-import threading
-from typing import Dict, Any, Optional, List
+from typing import Dict, Optional, List
 
 import numpy as np
 import pandas as pd
@@ -14,52 +10,7 @@ import polars as pl
 from numba import njit
 from polars import Expr
 
-from qmt_quote.enums import InstrumentType, BoardType
-
-
-def ticks_to_dataframe(datas: Dict[str, Dict[str, Any]],
-                       now: int, index_name: str = 'stock_code',
-                       level: int = 0, depths=["askPrice", "bidPrice", "askVol", "bidVol"],
-                       type: InstrumentType = -1,
-                       ) -> pd.DataFrame:
-    """字典嵌套字典 转 DataFrame
-
-    在全推行情中，接收到的嵌套字典转成DataFrame
-
-    Parameters
-    ----------
-    datas : dict
-        字典数据
-    now :int
-        当前时间戳
-    index_name
-        索引名，资产名
-    level : int
-        行情深度
-    depths
-        深度行情列名
-    type:
-        类型
-
-    Returns
-    -------
-    pd.DataFrame
-
-    """
-    df = pd.DataFrame.from_dict(datas, orient="index")
-    df["now"] = now
-    df["type"] = type
-    # df["avg_price"] = df["amount"] / df["pvolume"]
-
-    # 行情深度
-    for i in range(level):
-        j = i + 1
-        new_columns = [f'{c}_{j}' for c in depths]
-        df[new_columns] = df[depths].map(lambda x: x[i])
-
-    # 索引股票代码，之后要用
-    df.index.name = index_name
-    return df
+from qmt_quote.enums import BoardType
 
 
 def concat_dataframes_from_dict(datas: Dict[str, pd.DataFrame]) -> pl.DataFrame:
@@ -218,37 +169,6 @@ def calc_factor2(df: pl.DataFrame,
         .with_columns(factor2=(pl.col('factor1').cum_sum()).over(by1, order_by=by2))
     )
     return df
-
-
-def generate_code(length: int = 4) -> str:
-    """生成验证码"""
-    return ''.join(random.sample(string.digits, k=length))
-
-
-def input_with_timeout(prompt: str, timeout: int = 10) -> Optional[str]:
-    """带有超时的用户输入函数"""
-    print(prompt, end='', flush=True)
-    user_input = queue.Queue()
-
-    def get_input():
-        try:
-            text = input()
-            user_input.put(text)
-        except:
-            user_input.put(None)
-
-    # 创建输入线程
-    input_thread = threading.Thread(target=get_input)
-    input_thread.daemon = True
-    input_thread.start()
-
-    # 等待输入或超时
-    try:
-        result = user_input.get(timeout=timeout)
-        return result
-    except queue.Empty:
-        print()
-        return None
 
 
 @njit
