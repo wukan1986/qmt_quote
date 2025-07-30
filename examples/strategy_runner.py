@@ -13,15 +13,11 @@ sys.path.insert(0, str(Path(__file__).parent))  # 当前目录
 sys.path.insert(0, str(Path(__file__).parent.parent))  # 上一级目录
 
 from examples.config import (FILE_d1m, FILE_d5m, FILE_d1d, FILE_s1t, FILE_s1d, BARS_PER_DAY, TOTAL_ASSET)
-from qmt_quote.bars.labels import get_label_stock_1d, get_label
+from qmt_quote.bars.labels import get_label_stock_1d
 from qmt_quote.bars.signals import BarManager as BarManagerS
 from qmt_quote.dtypes import DTYPE_SIGNAL_1t
-from qmt_quote.utils_qmt import prepare_dataframe
 
-# TODO 这里简单模拟了分钟因子和日线因子
-from examples.factor_calc_1m import main as factor_func_1m  # noqa
-# from examples.factor_calc import main as factor_func_5m  # noqa
-from examples.factor_calc_1d import main as factor_func_1d  # noqa
+from examples.strategy_base import main
 
 # K线
 d1m = NPYT(FILE_d1m).load(mmap_mode="r")
@@ -42,10 +38,6 @@ s1d.clear()
 pd.set_option('display.width', 1000)
 pd.set_option('display.max_columns', None)
 pd.set_option('display.max_colwidth', None)
-
-# TODO 根据策略，在单股票上至少需要的窗口长度+1，然后乘股票数，再多留一些余量
-# 窗口长度为何要+1，因为最新的K线还在变化中，为了防止信号闪烁，用户在计算前可能会剔除最后一根K线
-TAIL_N = 120000
 
 
 def to_array_1d(df: pl.DataFrame, strategy_id: int = 0) -> np.ndarray:
@@ -69,65 +61,6 @@ def to_array_1d(df: pl.DataFrame, strategy_id: int = 0) -> np.ndarray:
     return arr
 
 
-def main(curr_time: int) -> None:
-    """
-    时间正好由10:23切换到10:24,这时curr_time标记的是10:24
-    10:24 bar一直在慢慢更新，10:23 bar已经固定
-    分钟线建议取10:23标签，但日线建议全部
-    """
-    # 过滤时间。调整成分钟标签，是取当前更新中的K线，还是取上一根不变的K线？
-    label_1m = get_label(curr_time, 60, tz=3600 * 8) - 60  # 前60秒，取的是已经不变化的K线
-    label_5m = get_label(curr_time, 300, tz=3600 * 8) - 0  # -0表示变化的K线，-300前300秒固定K线
-    # 日线, 东八区处理
-    label_1d = get_label(curr_time, 86400, tz=3600 * 8) - 0  # -0表示变化的K线，-86400，表示昨天日线
-
-    print(datetime.fromtimestamp(curr_time))
-    print(datetime.fromtimestamp(label_1m))
-    print(datetime.fromtimestamp(label_5m))
-    print(datetime.fromtimestamp(label_1d))
-
-    t1 = time.perf_counter()
-
-    filter_exprs = ~pl.col('stock_code').str.starts_with('68')
-
-    # TODO 计算因子。一定注意filter_last=True参数，否则s1d由于空间不足报错
-    filter_last = True
-    df1d = prepare_dataframe(d1d.tail(TOTAL_ASSET * 120), label_1d, 0, filter_exprs, pre_close='pre_close')  # 日线，要求当天K线是动态变化的
-    df1d = factor_func_1d(df1d, filter_last)
-    df1m = prepare_dataframe(d1m.tail(BARS_PER_DAY * 3), label_1m, label_1d, filter_exprs, pre_close='last_close')  # 1分钟线
-    df1m = df1m.with_columns(
-        date=pl.col('time').dt.date().cast(pl.Datetime(time_unit='ms', time_zone='Asia/Shanghai')) - pl.duration(hours=8),
-    )
-    df1m = df1m.join(df1d.select('stock_code', 'time', '过去5日平均每分钟成交量'), left_on=['stock_code', 'date'], right_on=['stock_code', 'time'])
-    df1m = factor_func_1m(df1m, filter_last)
-    t2 = time.perf_counter()
-
-    # 测试用，观察time/open_dt/close_dt
-    # print(df1m.tail(1))
-    # print(df5m.tail(1))
-    # print(df1d.tail(1))
-
-    # 将3个信号增量更新到内存文件映射，只插入最新一个截面
-    # s1t.append(to_array(df1m, strategy_id=1))
-    # s1t.append(to_array(df5m, strategy_id=2))
-    s1t.append(to_array_1d(df1d, strategy_id=3))
-    #
-    # 内存文件映射读取
-    time_ns = time.time_ns()
-    start, end, step = bm_s1d.extend(time_ns, s1t.read(n=BARS_PER_DAY), get_label_stock_1d, 3600 * 8)
-    # 只显示最新的3条
-    print(end, datetime.now(), t2 - t1)
-    # dd = pl.from_numpy(s1d.tail(TOTAL_ASSET)).filter(pl.col('f2')==1)
-    # dd = cast_datetime(dd, col=pl.col('time', 'open_dt', 'close_dt'))
-    # print(dd.to_pandas())
-    dd = pd.DataFrame(s1d.tail(TOTAL_ASSET))
-    dd = dd[dd['f2'] == 1]
-    dd['time'] = pd.to_datetime(dd['time'], unit='ms') + pd.Timedelta(hours=8)
-    dd['open_dt'] = pd.to_datetime(dd['open_dt'], unit='ms') + pd.Timedelta(hours=8)
-    dd['close_dt'] = pd.to_datetime(dd['close_dt'], unit='ms') + pd.Timedelta(hours=8)
-    print(dd.reset_index(drop=True))
-
-
 if __name__ == "__main__":
     bm_s1d = BarManagerS(s1d._a, s1d._t)
 
@@ -144,13 +77,29 @@ if __name__ == "__main__":
             continue
         # 正好在分钟切换时才会到这一步
         last_time = curr_time
-        main(curr_time)
+        t1 = time.perf_counter()
+        df1d, df1m = main(d1d, d1m, curr_time, filter_last=True)
+        t2 = time.perf_counter()
+        # 测试用，观察time/open_dt/close_dt
+        # print(df1m.tail(1))
+        # print(df5m.tail(1))
+        # print(df1d.tail(1))
 
-    # # TODO 测试用，记得修改日期
-    # for curr_time in range(int(datetime(2025, 3, 5, 9, 29).timestamp() // 60 * 60),
-    #                        int(datetime(2025, 3, 5, 15, 1).timestamp() // 60 * 60),
-    #                        60):
-    #     # 调整成成分钟标签，当前分钟还在更新
-    #     # curr_time = datetime(2025, 2, 28, 15, 0).timestamp() // 60 * 60
-    #     last_time = curr_time
-    #     main(curr_time)
+        # 将3个信号增量更新到内存文件映射，只插入最新一个截面
+        # s1t.append(to_array(df1m, strategy_id=1))
+        # s1t.append(to_array(df5m, strategy_id=2))
+        s1t.append(to_array_1d(df1d, strategy_id=3))
+        #
+        # 内存文件映射读取
+        start, end, step = bm_s1d.extend(time.time_ns(), s1t.read(n=BARS_PER_DAY), get_label_stock_1d, 3600 * 8)
+        # 只显示最新的3条
+        print(end, datetime.now(), t2 - t1)
+        # dd = pl.from_numpy(s1d.tail(TOTAL_ASSET)).filter(pl.col('f2')==1)
+        # dd = cast_datetime(dd, col=pl.col('time', 'open_dt', 'close_dt'))
+        # print(dd.to_pandas())
+        dd = pd.DataFrame(s1d.tail(TOTAL_ASSET))
+        dd = dd[dd['f2'] == 1]
+        dd['time'] = pd.to_datetime(dd['time'], unit='ms') + pd.Timedelta(hours=8)
+        dd['open_dt'] = pd.to_datetime(dd['open_dt'], unit='ms') + pd.Timedelta(hours=8)
+        dd['close_dt'] = pd.to_datetime(dd['close_dt'], unit='ms') + pd.Timedelta(hours=8)
+        print(dd.reset_index(drop=True))

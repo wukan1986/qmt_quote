@@ -24,8 +24,8 @@ from polars_ta.prefix.vec import *  # noqa
 DataFrame = TypeVar("DataFrame", _pl_LazyFrame, _pl_DataFrame)
 # ===================================
 
-_ = ["科创板", "pre_close", "vwap", "low", "HIGH", "最高涨跌", "上海主板", "close_dt", "amount", "创业板", "CLOSE", "SIGNAL1", "close", "深圳主板", "open", "factor2", "北交所", "high", "过去5日平均每分钟成交量", "volume", "最大涨幅限制", "收盘涨停", "circulating_cap", "high_limit", "收盘涨跌"]
-[科创板, pre_close, vwap, low, HIGH, 最高涨跌, 上海主板, close_dt, amount, 创业板, CLOSE, SIGNAL1, close, 深圳主板, open, factor2, 北交所, high, 过去5日平均每分钟成交量, volume, 最大涨幅限制, 收盘涨停, circulating_cap, high_limit, 收盘涨跌] = [pl.col(i) for i in _]
+_ = ["high_limit", "open", "过去5日平均每分钟成交量", "SIGNAL1", "high", "factor2", "收盘涨停", "最高涨跌", "上海主板", "vwap", "收盘涨跌", "volume", "low", "close_dt", "close", "pre_close", "最大涨幅限制", "创业板", "CLOSE", "circulating_cap", "北交所", "深圳主板", "科创板", "HIGH", "amount"]
+[high_limit, open, 过去5日平均每分钟成交量, SIGNAL1, high, factor2, 收盘涨停, 最高涨跌, 上海主板, vwap, 收盘涨跌, volume, low, close_dt, close, pre_close, 最大涨幅限制, 创业板, CLOSE, circulating_cap, 北交所, 深圳主板, 科创板, HIGH, amount] = [pl.col(i) for i in _]
 
 _ = ["OPEN", "LOW", "turnover_ratio", "缩量", "_x_3", "VWAP", "low_limit", "量比", "_x_0", "SIGNAL2", "SIGNAL3"]
 [OPEN, LOW, turnover_ratio, 缩量, _x_3, VWAP, low_limit, 量比, _x_0, SIGNAL2, SIGNAL3] = [pl.col(i) for i in _]
