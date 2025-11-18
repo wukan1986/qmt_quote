@@ -6,6 +6,5 @@ tqdm
 expr_codegen>=0.14.0
 polars_ta>=0.5.9
 xtquant
-npyt>=0.4.0
-numba<0.62.0
-numpy<2.3
+npyt>=0.4.2
+numba
