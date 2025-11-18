@@ -19,27 +19,19 @@ sys.path.insert(0, str(Path(__file__).parent))  # 当前目录
 sys.path.insert(0, str(Path(__file__).parent.parent))  # 上一级目录
 
 from examples.config import FILE_d1t, TOTAL_1t
+from examples.config_qmt import update_sector
 from qmt_quote.dtypes import DTYPE_STOCK_1t
 from qmt_quote.enums import InstrumentType
 from qmt_quote.inputs import generate_code, input_with_timeout
 from qmt_quote.utils_tick import ticks_to_dataframe
 
-# 开盘前需要先更新板块数据，因为会有新股上市
-print("开始更新板块数据")
-xtdata.download_sector_data()
-print("结束更新板块数据")
-
-G = Exception()
-G.沪深A股 = xtdata.get_stock_list_in_sector("沪深A股")
-G.沪深指数 = xtdata.get_stock_list_in_sector("沪深指数")
-G.沪深基金 = xtdata.get_stock_list_in_sector("沪深基金")
+G = update_sector()
 
 # in判断set比list快
 # 可以替换成选股票池，减少股票数后处理速度更快
 G.沪深A股 = set(G.沪深A股)
 G.沪深指数 = set(G.沪深指数)
 G.沪深基金 = set(G.沪深基金)
-print(f"沪深A股:{len(G.沪深A股)}, 沪深指数:{len(G.沪深指数)}, 沪深基金:{len(G.沪深基金)},")
 
 d1t = NPYT(FILE_d1t, dtype=DTYPE_STOCK_1t).save(capacity=TOTAL_1t).load(mmap_mode="r+")
 

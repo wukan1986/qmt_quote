@@ -12,13 +12,12 @@ from pathlib import Path
 import pandas as pd
 import polars as pl
 
-from qmt_quote.bars.agg import convert_1m_to_5m
-
 # 添加当前目录和上一级目录到sys.path
 sys.path.insert(0, str(Path(__file__).parent))  # 当前目录
 sys.path.insert(0, str(Path(__file__).parent.parent))  # 上一级目录
 
 from examples.config import HISTORY_STOCK_1d, HISTORY_STOCK_1m, HISTORY_STOCK_5m
+from qmt_quote.bars.agg import convert_1m_to_5m
 
 
 def adjust(df):

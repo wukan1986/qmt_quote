@@ -19,24 +19,17 @@ from pathlib import Path
 
 import polars as pl
 from loguru import logger
-from xtquant import xtdata
 
 # 添加当前目录和上一级目录到sys.path
 sys.path.insert(0, str(Path(__file__).parent))  # 当前目录
 sys.path.insert(0, str(Path(__file__).parent.parent))  # 上一级目录
 
 from examples.config import HISTORY_STOCK_1d, HISTORY_STOCK_1m, DATA_DIR, HISTORY_STOCK_5m
+from examples.config_qmt import update_sector
 from qmt_quote.bars.agg import convert_1m_to_5m
 from qmt_quote.utils_qmt import get_local_data_wrap
 
-# 开盘前需要先更新板块数据，因为会有新股上市
-print("开始更新板块数据")
-xtdata.download_sector_data()
-print("结束更新板块数据")
-
-G = Exception()
-G.沪深A股 = xtdata.get_stock_list_in_sector("沪深A股")
-G.沪深指数 = xtdata.get_stock_list_in_sector("沪深指数")
+G = update_sector()
 
 
 def save_1d(start_time, end_time):
@@ -96,7 +89,7 @@ if __name__ == "__main__":
     # end_time = "20250213"  # 测试用，以后要注释
     #
     # ==========
-    # logger.info('开始转存数据。请根据自己策略预留一定长度的数据')
+    logger.info('开始转存数据。请根据自己策略预留一定长度的数据')
     start_time = datetime.now() - timedelta(days=180)
     start_time = start_time.strftime("%Y%m%d")
     save_1d(start_time, end_time)

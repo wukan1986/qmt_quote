@@ -7,10 +7,7 @@ from typing import Dict, Optional, List
 import numpy as np
 import pandas as pd
 import polars as pl
-from numba import njit
 from polars import Expr
-
-from qmt_quote.enums import BoardType
 
 
 def concat_dataframes_from_dict(datas: Dict[str, pd.DataFrame]) -> pl.DataFrame:
@@ -130,8 +127,7 @@ def calc_factor1(df: pl.DataFrame,
         df
         .sort(by1, by2)
         .with_columns(
-            factor1=(pl.col(close).shift(1, fill_value=pl.first(pre_close)) / pl.col(pre_close)).round(8).over(
-                by1, order_by=by2))
+            factor1=(pl.col(close).shift(1, fill_value=pl.first(pre_close)) / pl.col(pre_close)).round(8).over(by1, order_by=by2))
         .with_columns(factor2=(pl.col('factor1').cum_prod()).over(by1, order_by=by2))
     )
     return df
@@ -164,35 +160,7 @@ def calc_factor2(df: pl.DataFrame,
         df
         .sort(by1, by2)
         .with_columns(
-            factor1=(pl.col(close).shift(1, fill_value=pl.first(pre_close)) - pl.col(pre_close)).round(8).over(by1,
-                                                                                                             order_by=by2))
+            factor1=(pl.col(close).shift(1, fill_value=pl.first(pre_close)) - pl.col(pre_close)).round(8).over(by1, order_by=by2))
         .with_columns(factor2=(pl.col('factor1').cum_sum()).over(by1, order_by=by2))
     )
     return df
-
-
-@njit
-def get_board_type(stock_code: str) -> int:
-    """获取股票板块类型
-    Parameters
-    ----------
-    stock_code:str
-        股票代码
-    Returns
-    -------
-    int
-        板块类型
-
-    """
-    if stock_code.startswith('60'):
-        return BoardType.SH
-    if stock_code.startswith('00'):
-        return BoardType.SZ
-    if stock_code.startswith('30'):
-        return BoardType.CYB
-    if stock_code.startswith('68'):
-        return BoardType.KCB
-    if stock_code.startswith('8') or stock_code.startswith('4') or stock_code.startswith('9'):
-        return BoardType.BJ
-
-    return BoardType.Unknown

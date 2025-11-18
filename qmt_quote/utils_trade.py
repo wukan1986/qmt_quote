@@ -5,12 +5,11 @@ import numpy as np
 import pandas as pd
 from npyt import NPYT
 from numba import njit
-from xtquant import xtconstant, xtdata
+from xtquant import xtconstant
 from xtquant.xtconstant import *  # noqa
 
 from examples.config import TOTAL_ASSET
 from qmt_quote.enums import SizeType, BoardType
-from qmt_quote.utils import get_board_type
 from qmt_quote.utils_qmt import get_instrument_detail_wrap
 
 
@@ -330,6 +329,33 @@ def cancel_orders(trader, account, orders: Optional[pd.DataFrame] = None,
     return orders
 
 
+@njit
+def get_board_type(stock_code: str) -> int:
+    """获取股票板块类型
+    Parameters
+    ----------
+    stock_code:str
+        股票代码
+    Returns
+    -------
+    int
+        板块类型
+
+    """
+    if stock_code.startswith('60'):
+        return BoardType.SH
+    if stock_code.startswith('00'):
+        return BoardType.SZ
+    if stock_code.startswith('30'):
+        return BoardType.CYB
+    if stock_code.startswith('68'):
+        return BoardType.KCB
+    if stock_code.startswith('8') or stock_code.startswith('4') or stock_code.startswith('9'):
+        return BoardType.BJ
+
+    return BoardType.Unknown
+
+
 def before_market_open(G) -> pd.DataFrame:
     """下载板块数据，获取当天涨跌停价
 
@@ -352,16 +378,6 @@ def before_market_open(G) -> pd.DataFrame:
     遇到风险股票时，公告出来了，但更名还是晚一步。所以需要使用其他手段获取并标记
 
     """
-    # 先下载板块数据
-    xtdata.download_sector_data()
-    # 没有 京市A股 沪深风险警示 沪深退市整理
-    xtdata.get_sector_list()
-
-    G.沪深A股 = xtdata.get_stock_list_in_sector("沪深A股")
-    G.科创板 = xtdata.get_stock_list_in_sector("科创板")
-    G.创业板 = xtdata.get_stock_list_in_sector("创业板")
-    G.沪深基金 = xtdata.get_stock_list_in_sector("沪深基金")
-
     details1 = get_instrument_detail_wrap(G.沪深A股)
     details1['board_type'] = details1.index.map(get_board_type)
     # 由于 沪深风险警示 沪深退市整理, 数据为空，只好从股票名字中获取
