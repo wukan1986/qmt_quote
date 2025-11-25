@@ -2,7 +2,6 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from loguru import logger
 from npyt import NPYT
 
 # 添加当前目录和上一级目录到sys.path
@@ -24,10 +23,5 @@ if __name__ == "__main__":
             break
         if code1 == code2:
             path = Path(BACKUP_DIR) / datetime.now().strftime("%Y%m%d")
-            d1t = NPYT(FILE_d1t).load(mmap_mode="r")
-            if d1t.resize():
-                d1t.backup(path)
-                break
-            else:
-                logger.error("归档失败!!!请关闭其他占用内存映射文件的程序后重试 {}", FILE_d1t)
-                continue
+            NPYT(FILE_d1t).load(mmap_mode="r").backup(path, resize=True)
+            break

@@ -3,8 +3,8 @@ polars
 pyarrow
 loguru
 tqdm
-expr_codegen>=0.14.0
-polars_ta>=0.5.9
+expr_codegen>=0.16.3
+polars_ta>=0.5.16
 xtquant
-npyt>=0.4.2
+npyt>=0.4.3
 numba
