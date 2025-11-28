@@ -81,11 +81,17 @@ if __name__ == "__main__":
     print("启动前请先同步网络时间")
     print(f"当前指针：{d1t.end()}")
     print('注意：仅在早上开盘前**重置文件指针**，用于覆盖昨天旧数据。盘中使用会导致今日已收数据被覆盖')
-    code1 = generate_code(4)
-    code2 = input_with_timeout(f"20秒內输入验证码重置文件指针({code1}/回车忽略)：", timeout=20)
-    if code2 == code1:
-        d1t.clear()
-        print("!!!重置文件指针成功!!!")
+    while True:
+        code1 = generate_code(2)
+        code2 = input_with_timeout(f"20秒內输入验证码重置文件指针({code1}/回车忽略)：", timeout=20)
+        if code2 == code1:
+            d1t.clear()
+            print("!!!重置文件指针成功!!!")
+            break
+        if code2 is None:
+            break
+        if code2 == "":
+            break
     print()
     print("开始订阅行情，**输入`:q`退出**")
     print()
