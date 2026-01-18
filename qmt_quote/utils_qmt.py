@@ -8,11 +8,12 @@ from typing import List
 import numpy as np
 import pandas as pd
 import polars as pl
+from polars_ta.utils.factor import calc_factor_muldiv
 from tqdm import tqdm
 from xtquant import xtdata
 
 from qmt_quote.enums import InstrumentType
-from qmt_quote.utils import cast_datetime, concat_dataframes_from_dict, calc_factor1
+from qmt_quote.utils import cast_datetime, concat_dataframes_from_dict
 from qmt_quote.utils_tick import ticks_to_dataframe
 
 
@@ -136,7 +137,7 @@ def prepare_dataframe(arr: np.ndarray, filter_le: float = 0, filter_ge: float = 
     df = cast_datetime(df, col=pl.col('time', 'open_dt', 'close_dt'))
     # 注意：时间没有转换成datetime类型
     # df = df.sort('stock_code', 'time')
-    df = calc_factor1(df, pre_close=pre_close)
+    df = calc_factor_muldiv(df, by1='stock_code', by2='time', close='close', pre_close=pre_close)
     df = df.with_columns([
         pl.col('stock_code').str.starts_with('60').alias('上海主板'),
         pl.col('stock_code').str.starts_with('00').alias('深圳主板'),
